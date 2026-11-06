@@ -8,3 +8,14 @@ cache/
 artifacts/
 out/
 .DS_Store
+
+# Python virtual environments (any subfolder)
+venv/
+.venv/
+**/venv/
+**/.venv/
+env/
+.env/
+
+# Temporary office files
+~$*
