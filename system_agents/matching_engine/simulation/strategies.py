@@ -1,10 +1,10 @@
 """Chiến lược khai giá cho mô phỏng đấu giá kép (Giai đoạn 2, nhiệm vụ 3).
 
 Thí nghiệm B: Khai giá chiến lược (Strategic Bidding).
-Tuân thủ đầy đủ hợp đồng tại anti-missions/contract-b.md.
+Tuân thủ hợp đồng trong CONTRACT.md (mục strategies.py).
 
 Giới hạn:
-Hệ số CS_NUMERIC là xấp xỉ cho thị trường 1 mua – 1 bán, một đơn vị; áp dụng
+Hệ số CS_NUMERIC là cân bằng tuyến tính của thị trường 1 mua – 1 bán, một đơn vị; áp dụng
 cho nhiều lệnh nhiều đơn vị chỉ là heuristic. lam là tham số quét, không phải
 cân bằng của thị trường nhiều lệnh. Cân bằng của k-double auction không duy nhất.
 """
@@ -36,19 +36,31 @@ CS_K05: Coeffs = {
     ASK: (1 / 4, 2 / 3),
 }
 
-# CS_NUMERIC với các khóa 0.25, 0.5, 0.75.
-# Hai mục 0.25, 0.75 là xấp xỉ số (tìm phản ứng tối ưu trên lưới 0.01),
-# KHÔNG phải kết quả trích từ tài liệu.
+def cs_linear_coeffs(k: float) -> Coeffs:
+    """Cân bằng tuyến tính (dạng đóng) của k-double auction, 1 mua – 1 bán, valuation đều trên [0, 1].
+
+    Suy ra từ điều kiện bậc nhất của từng phía, giả sử đối tác dùng chiến lược tuyến tính:
+      bid = (v + k*g) / (1 + k)                       (g = hệ số chặn của ask)
+      ask = (c + (1 - k)*(a + b)) / (2 - k)           (a, b = hệ số chặn, độ dốc của bid)
+    Giải hệ cho (a, b, g, d). Với k = 0.5 trả đúng (1/12, 2/3) và (1/4, 2/3) của Chatterjee-Samuelson.
+    Đã kiểm lại bằng tìm phản ứng tối ưu số (test_strategies); CHƯA đối chiếu với bài gốc.
+    Nghiệm tuyến tính không duy nhất: đây chỉ là một cân bằng. Hợp lệ với 0 < k < 1.
+    """
+    if not (0.0 < k < 1.0):
+        raise ValueError(f"k phải thuộc (0, 1), nhận được {k}")
+    b_slope = 1.0 / (1.0 + k)
+    d_slope = 1.0 / (2.0 - k)
+    # a = k*g/(1+k) và g = (1-k)*(a+b)/(2-k)  =>  g = (1-k)*b / ((2-k) - (1-k)*k/(1+k))
+    g = (1.0 - k) * b_slope / ((2.0 - k) - (1.0 - k) * k / (1.0 + k))
+    a = k * g / (1.0 + k)
+    return {BID: (a, b_slope), ASK: (g, d_slope)}
+
+
+# Khóa 0.25, 0.5, 0.75; dạng đóng của cs_linear_coeffs (CS_K05 là hằng số tham chiếu của k = 0.5).
 CS_NUMERIC: dict[float, Coeffs] = {
-    0.25: {
-        BID: (0.09, 0.78),
-        ASK: (0.37, 0.57),
-    },
+    0.25: cs_linear_coeffs(0.25),
     0.5: CS_K05,
-    0.75: {
-        BID: (0.06, 0.56),
-        ASK: (0.11, 0.84),
-    },
+    0.75: cs_linear_coeffs(0.75),
 }
 
 

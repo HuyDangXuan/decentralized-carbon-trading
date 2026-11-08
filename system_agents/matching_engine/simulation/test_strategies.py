@@ -1,6 +1,6 @@
 """Unit tests cho chiến lược khai giá và thí nghiệm B (Giai đoạn 2, nhiệm vụ 3).
 
-Tuân thủ đầy đủ tiêu chí chấp nhận trong hợp đồng và anti-missions/contract-b.md:
+Tuân thủ tiêu chí chấp nhận trong hợp đồng (CONTRACT.md):
 1. lam = 0 cho đúng valuation (trung thực).
 2. BID <= valuation, ASK >= valuation với 1000 valuation ngẫu nhiên và lam in {0.25, 0.5, 1}.
 3. Đơn điệu theo lam.

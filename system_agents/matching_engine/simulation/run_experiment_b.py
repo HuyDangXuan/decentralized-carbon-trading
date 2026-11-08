@@ -5,7 +5,7 @@ Thí nghiệm B: Khai giá chiến lược (Strategic Bidding).
 - b2: Quét cường độ khai giá lambda với nhiều lệnh.
 
 Giới hạn:
-Hệ số CS_NUMERIC là xấp xỉ cho thị trường 1 mua – 1 bán, một đơn vị; áp dụng
+Hệ số CS_NUMERIC là cân bằng tuyến tính của thị trường 1 mua – 1 bán, một đơn vị; áp dụng
 cho nhiều lệnh nhiều đơn vị chỉ là heuristic. lam là tham số quét, không phải
 cân bằng của thị trường nhiều lệnh. Cân bằng của k-double auction không duy nhất.
 """
