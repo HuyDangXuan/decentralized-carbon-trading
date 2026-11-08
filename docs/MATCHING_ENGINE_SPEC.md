@@ -326,8 +326,28 @@ Mã: `generator.py`, `metrics.py`, `strategies.py`, `run_experiment.py` (A), `ru
 **Giới hạn bắt buộc khi trích dẫn:**
 - Mẫu giữa các n **lồng nhau** (cùng seed, mẫu n nhỏ là tiền tố của mẫu n lớn): đây là common random numbers, không phải mẫu độc lập.
 - Engine định giá **theo từng cặp**; các kết quả cân bằng trong tài liệu (Chatterjee–Samuelson, Rustichini–Satterthwaite–Williams) nói về cơ chế giá đồng nhất. Không gọi kết quả này là "giá cân bằng đồng nhất".
-- Hệ số tuyến tính là cân bằng của thị trường 1 mua – 1 bán một đơn vị; chuyển sang nhiều lệnh nhiều đơn vị chỉ là heuristic, nên **không** được kết luận "thị trường chiến lược đạt ~93% hiệu quả", "hiệu quả không cải thiện khi n tăng" hay xếp hạng các k theo efficiency (chênh lệch nằm trong độ lệch chuẩn, và dưới λ = 1 chưa phải cân bằng).
+- Hệ số tuyến tính là cân bằng của thị trường 1 mua – 1 bán một đơn vị; chuyển sang nhiều lệnh nhiều đơn vị chỉ là heuristic, nên **không** được kết luận "thị trường chiến lược đạt ~93% hiệu quả", "hiệu quả không cải thiện khi n tăng" (efficiency thực ra hội tụ lên một giới hạn < 1 vì λ cố định; giới hạn giải tích ở §9.6) hay xếp hạng các k theo efficiency (chênh lệch nằm trong độ lệch chuẩn, và dưới λ = 1 chưa phải cân bằng).
 - Chưa làm: tìm phản ứng tối ưu ngay trong thị trường nhiều lệnh (ε-equilibrium) và kiểm định dự đoán mất hiệu quả O(1/m²) [Rustichini–Satterthwaite–Williams 1994, nêu theo kết quả tìm kiếm, chưa đọc bài gốc].
+
+### 9.6. Đối chiếu với tham vấn Argon (mức suy nghĩ "Cao", 08/11/2026)
+
+Câu trả lời do người phụ trách chuyển lại bằng văn bản; mỗi ý dưới đây ghi trạng thái kiểm chứng của nhóm, không chuyển nguyên văn thành kết luận.
+
+| Ý của Argon | Trạng thái | Cách kiểm |
+|---|---|---|
+| Xác suất giao dịch 9/32, efficiency 27/32, xác suất bỏ lỡ 7/32 (7/16 có điều kiện) | **Đã xác minh** (3 nguồn: Claude, reviewer model khác, Argon; Monte Carlo) | Tích phân giải tích + mô phỏng 20.000 lần |
+| Công thức đóng cho mọi k: `bid = k(1−k)/(2(1+k)) + v/(1+k)`, `ask = (1−k)/2 + c/(2−k)` | **Đã xác minh**: trùng `cs_linear_coeffs` ở k ∈ {0,1; 0,25; 0,5; 0,75; 0,9}; đây là suy ra độc lập lần thứ ba | `simulation/verify_closed_forms.py` (so với code) + test vét cạn phản ứng tối ưu |
+| Hệ số xấp xỉ lưới cũ (k = 0,25 và 0,75) lệch 0,015–0,04 | **Đã xác minh** (và đã sửa, commit `bc1ac42`) | So với dạng đóng |
+| Hiệu quả tiệm cận khi mọi người dùng cùng λ, k = 0,5: `1 − λ²/(4(3−λ)²)` = 1; 0,9979; 0,9900; 0,9722; 0,9375 theo λ = 0 … 1; tổng quát λ = 1: `1 − (1−k+k²)²/9` | **Đã xác minh bằng mô phỏng lớn**: n = 4000 cho 0,9981; 0,9901; 0,9720; 0,9355 (k = 0,5) và 0,9244 / 0,9254 so với dự đoán 0,9266 (k = 0,25 / 0,75); hội tụ từ dưới khi n tăng | Hiệu số < 0,003 ở n = 4000; phần hụt ở n nhỏ phù hợp với lập luận mất cân bằng khối lượng hai phía nhưng **chưa tách riêng nguyên nhân** |
+| Lập luận: chiến lược đơn điệu chung ⇒ thứ tự khớp không đổi, welfare chỉ phụ thuộc điểm cắt | Phù hợp reviewer model khác và số liệu B2 | Hai nguồn độc lập |
+| Định lý O(1/m²) của Rustichini–Satterthwaite–Williams áp dụng cho **giá chung**, không phải giá theo từng cặp | Phù hợp kết quả tìm kiếm (mô hình "price set to equate revealed demand and supply"); chưa đọc bài gốc | Cần đọc bài |
+| "Trong giá theo từng cặp, động cơ khai giá không suy giảm như O(1/m)" | **Giả thuyết**, chưa có chứng minh hay nguồn | Phải đo bằng thí nghiệm (ε-equilibrium); không trích như sự thật |
+| Cỡ mẫu hiệu dụng `m_eff = (Σq)²/Σq²`, `E[q²] = 858,5`, `m_eff ≈ 0,379·n`; độ lệch chuẩn chênh lệch khối lượng mua–bán ≈ 293 đơn vị ở n = 100 | Phần số học **đã kiểm** (phép tính trực tiếp) | Tính tay |
+| Khuyến nghị thiết kế: mẫu độc lập giữa các n, ≥ 5 mức n, 200–500 seed; số lệnh mua = số lệnh bán (stratified); bỏ làm tròn 0,01 khi đo tốc độ hội tụ; quy trình lặp phản ứng tối ưu có làm trơn và đo ε trên seed kiểm định riêng; kiểm tra lớp chiến lược phụ thuộc khối lượng | **Đề xuất hợp lý, chưa làm**; trùng một phần với reviewer (mẫu lồng nhau) | Thực hiện ở bước tiếp theo |
+| Nguồn: Ausubel và cs. (2014, *Review of Economic Studies* 81(4)); Bosshard và cs. (2020) "Management Science"; Chatterjee–Samuelson "Mục 3 và 4" | Ausubel: **đúng**. Bosshard: **sai nơi đăng**, bài thực là *Journal of Artificial Intelligence Research* 69 (2020). Số mục trong Chatterjee–Samuelson: **không kiểm chứng được** | Tìm kiếm web |
+| Các cách giải thích con số "1/6" của nguồn kia (thặng dư tối đa, thâm hụt Myerson–Satterthwaite, khoảng cách hệ số chặn, mức mất làm tròn) | **Suy đoán**, chưa kiểm chứng nguồn đó | Không trích 1/6 |
+
+Hệ quả cho thí nghiệm tiếp theo (chưa thực hiện): (i) dùng stratified 50/50 số lệnh và seed độc lập giữa các n, (ii) chạy song song nhánh giá chung của phiên (§7) để đối chứng với giá theo cặp, (iii) tìm ε-equilibrium trong lớp chiến lược bốn tham số trước khi kết luận về hiệu quả theo n, (iv) báo cáo `ε` chuẩn hóa; kiểm quy trình trên n = 2 phải tái tạo dạng đóng ở §9.1.
 
 ---
 
