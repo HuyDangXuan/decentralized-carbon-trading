@@ -33,3 +33,13 @@ Chỉ dùng thư viện chuẩn, trừ `run_experiment.py` được dùng `matpl
 4. `buyer_surplus + seller_surplus == welfare` (sai số 1e-6); `k = 0` → `seller_surplus == 0`; `k = 1` → `buyer_surplus == 0`.
 5. Mọi match có `ask ≤ clearing_price ≤ bid` theo giá khai; không `order_id` nào khớp vượt `amount` ban đầu.
 6. Ví dụ tay: BID(val 12, amount 10), BID(val 8, amount 5), ASK(val 6, amount 7), ASK(val 9, amount 20) với `k = 0.5`, bid trung thực → khớp 7 đơn vị ở giá 9.0 giữa BID-12 và ASK-6, rồi 3 đơn vị giữa BID-12 và ASK-9 ở giá 10.5; `welfare = 7·6 + 3·3 = 51.0`, `max_welfare = 51.0`.
+
+## `run_experiment.py` (thí nghiệm A: khai giá trung thực, chia thặng dư theo k)
+CLI: `python run_experiment.py a [--n 100,200,500] [--k 0,0.5,1] [--runs 30] [--out results]` (mặc định như trên; `--out` tương đối so với thư mục chứa script, tạo nếu chưa có).
+Với mỗi `n`, mỗi `seed` trong `range(runs)`: `valued = generate_valued(n, seed)`; chạy `run_auction(valued, k)` cho từng `k` (bid trung thực).
+Ghi:
+- `exp_a_raw.csv`, cột theo thứ tự: `k,n,seed,welfare,max_welfare,efficiency,buyer_surplus,seller_surplus,volume,fill_rate` (`efficiency = welfare / max_welfare`, `max_welfare == 0` → 1.0), một dòng mỗi (k, n, seed), dấu phẩy, UTF-8, tiêu đề ở dòng đầu.
+- `exp_a_summary.csv`, cột: `k,n,runs,welfare_mean,welfare_std,buyer_share_mean,buyer_share_std,seller_share_mean,seller_share_std,fill_rate_mean`; `buyer_share = buyer_surplus / welfare` (welfare = 0 thì bỏ qua lần chạy đó khi tính trung bình); std là độ lệch chuẩn mẫu (n−1), 1 mẫu thì 0.
+- `exp_a_surplus_split.png`: biểu đồ cột nhóm theo `k` (trục x), mỗi `n` một cột, chiều cao = `buyer_share_mean` kèm thanh sai số = `buyer_share_std`; nhãn trục và tiêu đề tiếng Việt; `matplotlib.use("Agg")`; không `plt.show()`.
+Kiểm tra bắt buộc trong script: với mỗi (n, seed), `welfare` bằng nhau giữa các `k` (sai số 1e-6) và bằng `max_welfare`; nếu sai in `LỖI: welfare đổi theo k ...` ra stderr và thoát mã 1. Nếu đúng in dòng `Kiểm tra bất biến welfare theo k: OK (<số cấu hình> cấu hình)`.
+Cuối cùng in bảng tóm tắt (cột căn thẳng) ra stdout. Trả mã 0 khi thành công. Tham số sai (k ngoài [0,1], n < 2, runs < 1, danh sách rỗng) → `argparse` lỗi, mã 2.
