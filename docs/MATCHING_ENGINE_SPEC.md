@@ -39,7 +39,7 @@ graph LR
 Mã nguồn liên quan:
 - [`order_book.py`](../system_agents/matching_engine/order_book.py) — `Order`, `MatchResult`.
 - [`auction_agent.py`](../system_agents/matching_engine/auction_agent.py) — `DoubleAuctionAgent`: sắp bid giảm dần/ask tăng dần, ghép hai con trỏ khi `bid >= ask`, giá khớp từng cặp `p = k·bid + (1−k)·ask`.
-- [`CarbonDoubleAuction.sol`](../contracts/CarbonDoubleAuction.sol) — `settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)`, chống replay qua `executedTrades[tradeHash]`.
+- [`CarbonDoubleAuction.sol`](../contracts/CarbonDoubleAuction.sol) — **bản đang trên `main` (cũ):** `settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)`, chống replay qua `executedTrades[tradeHash]`, chỉ chuyển token carbon. Thiết kế mới của Đức [D] đổi hàm thành `settleMatchedTrade(MatchedTrade)`, chống replay bằng `filledAmount` và `nonce`, kèm thanh toán ERC-20; spec này bám theo [D] từ §3 trở đi.
 
 **Hiện trạng cần lưu ý của baseline (đã kiểm tra bằng cách chạy code):**
 - `run_periodic_double_auction()` **trừ trực tiếp vào `Order.amount`** của đối tượng đầu vào (một phiên 50 lệnh: tổng amount 1260 → 662). Mô phỏng phải `deepcopy` lệnh trước mỗi lần chạy; bản triển khai chính thức nên dùng `remaining_amount` riêng.
@@ -182,6 +182,9 @@ sequenceDiagram
 
 - `time_in_force` **không nằm trong struct `Order` được ký** [D, §3.2], nên hợp đồng không bảo đảm engine tôn trọng GTC/IOC mà người dùng chọn. Giới hạn cứng duy nhất do người dùng ký là `deadline`: lệnh hết hạn thì `settleMatchedTrade` revert `SignatureExpired`. Hai hướng cần chốt với Đức: (a) thêm `timeInForce` vào `ORDER_TYPEHASH` để ràng buộc được ký; (b) giữ ngoài chuỗi và coi là tùy chọn không tin cậy của engine, khi đó rollover GTC chỉ là hành vi mặc định trong khoảng `deadline`.
 - Lệnh bị hủy trên chuỗi (`cancelOrder`, event `OrderCancelled`) hoặc vô hiệu do `incrementNonce` (event `UserNonceIncremented`) phải bị loại khỏi snapshot; engine lắng nghe các event này. Hủy ngoài chuỗi qua API (§8.2) chỉ là yêu cầu tới engine: nếu engine ngoại tuyến hoặc không tuân thủ, chữ ký cũ vẫn còn hiệu lực đến `deadline`; muốn bảo đảm cứng người dùng phải gọi `cancelOrder` on-chain.
+- **Kiểm tra trạng thái ngay trước khi gửi:** engine có thể đã ngoại tuyến khi người dùng gọi `incrementNonce` hoặc `cancelOrder`, nên lệnh `ROLLED_OVER` nằm trong sổ có thể đã vô hiệu mà engine chưa biết. Trước mỗi lần gửi settlement, engine đọc lại nonce hiện tại, trạng thái hủy và `filledAmount` của cả hai lệnh; lệnh không hợp lệ bị loại và đề xuất khớp tính lại.
+- **Cuộc đua với `deadline`:** khớp ở cutoff không đảm bảo giao dịch on-chain nằm trong hạn; nếu block chứa giao dịch có timestamp sau `deadline` thì hợp đồng revert `SignatureExpired`. Engine loại lệnh có `deadline < cutoff + biên_an_toàn` (biên cần chốt, tối thiểu bằng thời gian xác nhận block ước tính cộng thời gian chờ batch).
+- **Phân bổ bằng 0:** pro-rata sau `floor` có thể cho `matchAmount = 0` với lệnh nhỏ; engine bỏ qua các lần khớp bằng 0, không gửi lên chuỗi (hợp đồng của Đức yêu cầu số lượng dương hay không là điểm cần xác nhận).
 - Khối lượng đã khớp lấy từ `filledAmount[orderId]` on-chain; nếu đệ trình khớp vượt phần còn lại, hợp đồng revert `OrderAmountExceeded`. Engine đồng bộ `remaining_amount` đầu phiên để không đề xuất khớp vô hiệu.
 
 Giới hạn: rollover không bảo đảm khớp ở phiên sau; cần `max_rollover_count` hoặc TTL để orderbook không phình vô hạn (**giá trị chưa chốt**, §11). Cơ chế carry-over giữa các phiên đã được mô tả cho batch auction ở [R3]; mô tả rollover theo mô hình sequential của bài về VCM [R1] **chưa được kiểm chứng** vì chưa đọc toàn văn.
@@ -251,6 +254,7 @@ sequenceDiagram
 **Trạng thái đối chiếu với spec hợp đồng của Đức [D] (đã đọc bản v2, commit `3194bad`, branch `docs/smart-contract-spec`, chưa merge vào `main`):**
 - *Thanh toán nguyên tử:* bản `CarbonDoubleAuction.sol` hiện trên `main` chỉ chuyển token carbon, không có bước trả tiền; [D, §3.1] thiết kế một giao dịch chuyển cả token thanh toán ERC-20 lẫn token carbon và hoàn tác toàn bộ nếu thiếu. Mô hình này phù hợp với DvP thông dụng [S2] (nguồn vendor/blog, không có nguồn riêng cho ERC-1155). **Mã trong `contracts/` chưa được cập nhật theo [D]**, nên đến lúc đó phần thiết kế mới là kế hoạch, không phải hành vi đã có.
 - *Xác minh chữ ký và giá on-chain:* [D, §3.3] kiểm chữ ký EIP-712, `ask ≤ clearingPrice ≤ bid`, `filledAmount + matchAmount ≤ amount`. Điều này **giảm** giả định tin cậy vào engine: engine không thể gửi cặp khớp không có chữ ký, vượt giá hay vượt khối lượng. Phần còn lại engine có thể làm sai mà hợp đồng không phát hiện: bỏ sót hoặc ưu tiên sai lệnh hợp lệ (vi phạm công bằng thứ tự, không vi phạm điều kiện on-chain), chọn `clearingPrice` thiên lệch trong khoảng [ask, bid], và trì hoãn phiên.
+- *Vận hành engine:* người vận hành thấy toàn bộ luồng lệnh trước cutoff nên về nguyên tắc có thể giao dịch ngoài chuỗi trước (front-run off-chain) hoặc ưu tiên lệnh của mình; hợp đồng không phát hiện được. Cần ràng buộc vận hành (engine không tham gia thị trường, công bố băm snapshot lệnh trước cutoff để kiểm tra sau) — chưa có thiết kế cụ thể.
 - *Quyền gọi:* [D] cần quy định rõ ai được gọi `settleMatchedTrade` (code `main` dùng `onlyMatchingAgent`); quản lý khóa của Settlement Submitter thuộc thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
 - *MEV/front-running:* thứ tự giao dịch on-chain vẫn chịu rủi ro [R9]; chữ ký lệnh không loại bỏ rủi ro này.
 - *Batch:* `batchSettleMatchedTrades` bọc từng cặp trong kiểm tra độc lập để một lệnh lỗi không chặn cả phiên [D, §4]; engine cần giới hạn kích thước batch theo gas (ước tính của [D, §5]: 10 cặp ≈ 920.000 gas — số liệu của Đức, chưa được kiểm chứng độc lập).
@@ -265,7 +269,7 @@ sequenceDiagram
 
 Kiểm tra sơ bộ bằng baseline hiện có (3 seed, 500 lệnh, giá khai = valuation thật, k ∈ {0, 0.5, 1}) cho thấy **thặng dư xã hội giống hệt nhau với mọi k** (ví dụ 14482.81); k chỉ đổi cách chia giữa bên mua và bên bán (buyer/seller surplus: 14482.81/0 khi k=0, ≈ một nửa mỗi bên khi k=0.5, 0/14482.81 khi k=1). Điều này đúng với lý thuyết: với allocation và valuation cố định, giá chỉ phân chia lợi ích. Vì vậy thiết kế thí nghiệm phải tách hai câu hỏi:
 
-- **Thí nghiệm A — phân chia thặng dư khi khai giá trung thực.** Đo `buyer_surplus`, `seller_surplus`, `welfare` theo k. `welfare` bất biến theo k đóng vai trò **kiểm tra tính đúng (sanity check)**, không phải kết quả nghiên cứu.
+- **Thí nghiệm A — phân chia thặng dư khi khai giá trung thực.** Đo `buyer_surplus`, `seller_surplus`, `welfare` theo k. `welfare` bất biến theo k đóng vai trò **kiểm tra tính đúng (sanity check)**, không phải kết quả nghiên cứu. Bất biến này mới được kiểm chứng bằng code cho quy tắc giá theo từng cặp; với giá chung của phiên (§7) phân bổ vẫn như cũ nên welfare lẽ ra không đổi, nhưng điều kiện `ask ≤ p* ≤ bid` của mọi cặp được khớp phải kiểm riêng khi cài đặt quy tắc đó.
 - **Thí nghiệm B — tác tử khai giá chiến lược.** Cho tác tử shading giá (bid thấp hơn / ask cao hơn valuation) theo hàm phụ thuộc k (theo hướng mô hình [R4]) hoặc theo chiến lược thích nghi. Đo `welfare`, khối lượng khớp và tỷ lệ giao dịch bị mất so với benchmark khai trung thực. Chỉ ở thí nghiệm này k mới có thể ảnh hưởng đến welfare.
 
 **Hướng thiết kế cho thí nghiệm B:**
@@ -339,7 +343,8 @@ Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trốn
 8. `time_in_force` có đưa vào struct được ký không (§6.1).
 9. Ngữ nghĩa `nonce`/`incrementNonce` của [D]: tăng nonce vô hiệu hóa mọi lệnh cũ hay từng lệnh; ảnh hưởng tới lệnh GTC đang nằm trong sổ.
 10. Cập nhật `contracts/` theo [D] (hiện `main` chưa có bước thanh toán và xác minh chữ ký on-chain) và thứ tự merge branch của Đức.
-11. Quản lý khóa của Settlement Submitter, quyền gọi `settleMatchedTrade`, và phương án khi tác tử ngừng hoạt động.
+11. Điểm cần Đức xác nhận trong [D] (xem `docs/PHI_CAN_TRAO_DOI.md`): kiểm `filledAmount` chỉ nêu cho phía bid ở [D, §3.3, bước 3] (cần cả phía ask); ai được gọi `cancelOrder`; `matchAmount = 0` có bị từ chối không.
+12. Quản lý khóa của Settlement Submitter, quyền gọi `settleMatchedTrade`, và phương án khi tác tử ngừng hoạt động.
 
 ---
 
