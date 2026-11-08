@@ -54,25 +54,34 @@ Mã nguồn liên quan:
 
 `Order(order_id, trader_id, order_type, token_id, amount, price, timestamp, signature)` và `MatchResult(bid_order_id, ask_order_id, token_id, amount, clearing_price, timestamp)`.
 
-### 3.2. Trường đề xuất bổ sung (chưa có trong code, cần nhóm xác nhận)
+### 3.2. Ánh xạ sang `Order` của hợp đồng và trường nội bộ của engine
 
-| Trường | Kiểu | Mục đích |
+Spec hợp đồng của Đức [D] (`docs/SMART_CONTRACT_SPEC.md`, §3.2 và §3.4) quy định struct `Order` được ký EIP-712. Engine phải nhận và chuyển tiếp **đúng struct đó**; các trường chỉ có ở engine không được ký.
+
+| Trường engine | Nguồn / ánh xạ | Ghi chú |
 |---|---|---|
-| `trader_address` | `str` (ví 0x…) | Địa chỉ ví dùng cho `buyer`/`seller` của `settleMatchedTrade`; tách khỏi `trader_id` nghiệp vụ. |
-| `status` | `NEW \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
-| `time_in_force` | `GTC \| IOC` | Rollover hay hủy phần dư (§6). |
-| `expiry` | `float` (epoch) | Hạn hiệu lực do người dùng đặt. |
-| `remaining_amount` | `int` | Khối lượng chưa khớp; giữ `amount` gốc bất biến. |
-| `first_session_id` / `sessions_alive` | `str` / `int` | Số phiên lệnh đã tồn tại, dùng cho ưu tiên theo tuổi (§5). |
+| `order_id` (code hiện tại: `str`) | `Order.orderId` (`bytes32`) | Đổi sang `bytes32` (hex 0x…) khi code hóa GĐ3. |
+| `trader_address` | `Order.trader` (`address`) | `trader_id` nghiệp vụ chỉ còn là nhãn nội bộ. |
+| `order_type` | `Order.orderType` (`uint8`: 0 = BID, 1 = ASK) | Khớp `OrderType` hiện có. |
+| `token_id` | `Order.tokenId` | |
+| `amount` | `Order.amount` (`uint128`) | **Chưa thống nhất đơn vị**, xem §3.3. |
+| `price` | `Order.pricePerUnit` (`uint128`, wei của token thanh toán) | Số nguyên, không dùng `float` (§3.3). |
+| `nonce` | `Order.nonce` | Chống phát lại; xem §8.1 về `incrementNonce`. |
+| `deadline` | `Order.deadline` (epoch giây) | Thay trường `expiry` đề xuất trước đây. |
+| `signature` | `bidSignature` / `askSignature` của `MatchedTrade` | |
+| `status` | chỉ engine: `NEW \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
+| `time_in_force` | chỉ engine: `GTC \| IOC` | **Không nằm trong struct được ký**; xem §6.1. |
+| `remaining_amount` | chỉ engine, **suy ra từ `filledAmount[orderId]` on-chain** | Hợp đồng là nguồn sự thật về khối lượng đã khớp [D, §3.3, bước 3]; engine đồng bộ đầu mỗi phiên, giữ `amount` gốc bất biến. |
+| `first_session_id` / `sessions_alive` | chỉ engine | Ưu tiên theo tuổi (§5.2). |
 
-`MatchResult` bổ sung `session_id` và `trade_hash`.
+`MatchResult` bổ sung `session_id` và ánh xạ sang `MatchedTrade` của [D]: `{bidOrder, askOrder, bidSignature, askSignature, matchAmount, clearingPrice}`.
 
-**Cách tính `trade_hash`:** `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`. Dùng `abi.encode` (không dùng `encodePacked`) để tránh va chạm giữa các chuỗi có độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` và khuyến nghị ưu tiên `abi.encode` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên khi partial fill.
+**`trade_hash`:** `MatchedTrade` trong [D] **không có** trường `tradeHash`; sự kiện `TradeSettled` mang `tradeHash` do hợp đồng sinh, và chống phát lại dựa vào `filledAmount` theo từng lệnh cùng `nonce`. Vì vậy `trade_hash` ở phía engine chỉ là **khóa idempotency nội bộ** (tránh gửi hai lần cùng một khớp khi retry), không gửi on-chain. Công thức đề xuất: `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`; dùng `abi.encode` thay `encodePacked` để tránh va chạm giữa các giá trị độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên.
 
 ### 3.3. Đơn vị, tick giá và giả định
 
-- `amount`: số nguyên tCO2e (1 token = 1 tCO2e, khớp `CarbonCredit1155.sol`).
-- **Tick giá:** để bảo đảm `ask ≤ p ≤ bid`, giá tính bằng số nguyên theo đơn vị nhỏ nhất (ví dụ cent hoặc đơn vị stablecoin test), không dùng `float`. Quy tắc làm tròn của giá khớp (về phía có lợi cho bên nào) là **quyết định cần chốt**; tối thiểu phải đảm bảo kết quả không rời khoảng [ask, bid]. Đây cũng là biểu diễn cần để khớp với `uint256 pricePerUnit` on-chain.
+- `amount`: số nguyên (`uint128` on-chain). **Đơn vị đang mâu thuẫn giữa các tài liệu:** [D] §3.2 ghi `kg CO2e`; báo cáo Giai đoạn 1 và các phiên bản trước của spec này ghi 1 token = 1 tCO2e; `CarbonCredit1155.sol` trên `main` không nêu đơn vị. Engine không phụ thuộc đơn vị (chỉ cộng/trừ số nguyên) nhưng phải chốt một đơn vị duy nhất với Đức trước khi code hóa, vì nó đổi cả `max_amount` trong mô phỏng lẫn cách quy đổi tổng thanh toán `matchAmount × clearingPrice`.
+- **Tick giá:** hợp đồng kiểm `askOrder.pricePerUnit ≤ clearingPrice ≤ bidOrder.pricePerUnit` và revert `PriceMismatch` nếu vi phạm [D, §3.3, bước 2], nên điều kiện này là **ràng buộc cứng**, không chỉ là bất biến kiểm thử. Giá tính bằng số nguyên theo đơn vị nhỏ nhất của token thanh toán, không dùng `float`. Công thức `k·bid + (1−k)·ask` với số nguyên phải làm tròn sao cho kết quả luôn nằm trong [ask, bid] (ví dụ làm tròn xuống rồi kẹp vào [ask, bid]); hướng làm tròn là quyết định cần chốt. Baseline hiện tại `round(…, 2)` không bảo đảm điều này (ask=10.001, bid=10.004, k=0 → 10.0).
 - `token_id` đại diện một lớp tín chỉ đủ điều kiện thay thế (project + vintage); engine chỉ khớp lệnh cùng `token_id` và **không** tự đánh giá tính đồng nhất.
 
 ---
@@ -169,6 +178,12 @@ sequenceDiagram
     E-->>S: MatchResult[] + rollover_report
 ```
 
+### 6.1. Ràng buộc từ hợp đồng
+
+- `time_in_force` **không nằm trong struct `Order` được ký** [D, §3.2], nên hợp đồng không bảo đảm engine tôn trọng GTC/IOC mà người dùng chọn. Giới hạn cứng duy nhất do người dùng ký là `deadline`: lệnh hết hạn thì `settleMatchedTrade` revert `SignatureExpired`. Hai hướng cần chốt với Đức: (a) thêm `timeInForce` vào `ORDER_TYPEHASH` để ràng buộc được ký; (b) giữ ngoài chuỗi và coi là tùy chọn không tin cậy của engine, khi đó rollover GTC chỉ là hành vi mặc định trong khoảng `deadline`.
+- Lệnh bị hủy trên chuỗi (`cancelOrder`, event `OrderCancelled`) hoặc vô hiệu do `incrementNonce` (event `UserNonceIncremented`) phải bị loại khỏi snapshot; engine lắng nghe các event này. Hủy ngoài chuỗi qua API (§8.2) chỉ là yêu cầu tới engine: nếu engine ngoại tuyến hoặc không tuân thủ, chữ ký cũ vẫn còn hiệu lực đến `deadline`; muốn bảo đảm cứng người dùng phải gọi `cancelOrder` on-chain.
+- Khối lượng đã khớp lấy từ `filledAmount[orderId]` on-chain; nếu đệ trình khớp vượt phần còn lại, hợp đồng revert `OrderAmountExceeded`. Engine đồng bộ `remaining_amount` đầu phiên để không đề xuất khớp vô hiệu.
+
 Giới hạn: rollover không bảo đảm khớp ở phiên sau; cần `max_rollover_count` hoặc TTL để orderbook không phình vô hạn (**giá trị chưa chốt**, §11). Cơ chế carry-over giữa các phiên đã được mô tả cho batch auction ở [R3]; mô tả rollover theo mô hình sequential của bài về VCM [R1] **chưa được kiểm chứng** vì chưa đọc toàn văn.
 
 ---
@@ -192,15 +207,15 @@ Cả hai đều **không** bảo đảm khai giá trung thực (midpoint/k-rule 
 ### 8.1. Nguyên tắc
 
 - REST cho đặt/hủy/truy vấn; WebSocket cho cập nhật thời gian thực.
-- Lệnh ghi phải kèm chữ ký **EIP-712** (cấu trúc domain/struct do Đức quy định). Engine xác minh chữ ký **ngoài chuỗi** trước khi nhận lệnh và không giữ private key người dùng.
-- API không khóa tài sản khi đặt lệnh; kiểm tra `balanceOf`/`isApprovedForAll` là trách nhiệm client. Tài sản chỉ chuyển ở bước settlement.
+- Lệnh ghi phải kèm chữ ký **EIP-712** với domain và struct `Order` theo [D, §3.2] (domain `EPU Carbon Double Auction`, version `2.0`, `chainId` 80002 trên Polygon Amoy). Engine xác minh chữ ký **ngoài chuỗi** để lọc sớm lệnh sai, không giữ private key người dùng; hợp đồng **xác minh lại on-chain** khi settlement [D, §3.3, bước 1], nên engine không phải điểm tin cậy duy nhất cho tính hợp lệ của lệnh.
+- API không khóa tài sản khi đặt lệnh (mô hình non-custodial [D, §3.1]); người mua cần `approve` token thanh toán, người bán cần `setApprovalForAll`. Engine có thể kiểm tra `balanceOf`/`allowance` khi nhận lệnh để loại lệnh chắc chắn revert, nhưng kết quả chỉ có tính tham khảo vì số dư thay đổi sau đó.
 
 ### 8.2. REST
 
 | Method | Path | Mô tả | Request (rút gọn) | Response |
 |---|---|---|---|---|
-| `POST` | `/v1/orders` | Đặt lệnh | `{order_type, token_id, amount, price, time_in_force, expiry, trader_address, signature}` | `201 {order_id, status:"NEW"}` |
-| `DELETE` | `/v1/orders/{order_id}` | Hủy lệnh trước cutoff | `{signature}` | `200 {order_id, status:"CANCELLED"}` |
+| `POST` | `/v1/orders` | Đặt lệnh | `{order:{orderId, trader, orderType, tokenId, amount, pricePerUnit, nonce, deadline}, signature, time_in_force}` | `201 {orderId, status:"NEW"}` |
+| `DELETE` | `/v1/orders/{orderId}` | Yêu cầu engine bỏ lệnh khỏi các phiên sau (xem §6.1: không thay thế `cancelOrder` on-chain) | `{signature}` (chữ ký của `trader`) | `200 {orderId, status:"CANCELLED"}` |
 | `GET` | `/v1/orders/{order_id}` | Trạng thái lệnh | — | `200 {…Order, status, remaining_amount}` |
 | `GET` | `/v1/orderbook/{token_id}` | Snapshot sổ lệnh | — | `200 {bids, asks}` |
 | `GET` | `/v1/sessions/{session_id}/matches` | Kết quả khớp của phiên | — | `200 {matches}` |
@@ -214,7 +229,7 @@ Mã lỗi tối thiểu: `400` (sai cấu trúc/giá trị), `401` (chữ ký sa
 |---|---|---|
 | `orderbook.{token_id}` | `orderbook.update` | Delta top-of-book |
 | `session.{session_id}` | `match.executed` | `MatchResult` kèm `trade_hash`, trước khi gửi on-chain |
-| `session.{session_id}` | `settlement.confirmed` | Khi nhận event `TradeExecuted` |
+| `session.{session_id}` | `settlement.confirmed` | Khi nhận event `TradeSettled` [D, §3.4] |
 | `session.{session_id}` | `settlement.failed` | Khi giao dịch revert; retry có giới hạn, không lặp vô hạn |
 
 ### 8.4. Luồng settlement và giới hạn tin cậy
@@ -226,18 +241,19 @@ sequenceDiagram
     participant SC as CarbonDoubleAuction.sol
 
     E->>E: run_periodic_double_auction() ra MatchResult[]
-    E->>E: tính trade_hash
-    E->>SUB: MatchResult và trade_hash
-    SUB->>SC: settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)
-    SC-->>SUB: TradeExecuted hoặc revert
+    E->>E: đồng bộ remaining_amount từ filledAmount, loại lệnh đã hủy
+    E->>SUB: MatchedTrade[] (bidOrder, askOrder, 2 chữ ký, matchAmount, clearingPrice)
+    SUB->>SC: batchSettleMatchedTrades(trades) hoặc settleMatchedTrade(trade)
+    SC-->>SUB: TradeSettled hoặc revert (PriceMismatch, OrderAmountExceeded, ...)
     SUB-->>E: cập nhật status hoặc ghi log lỗi
 ```
 
-**Giới hạn của thiết kế hiện tại (phát hiện khi đối chiếu với contract, cần trao đổi với Đức):**
-1. `settleMatchedTrade` **chỉ chuyển token carbon** từ seller sang buyer; không có bước thanh toán tiền. `pricePerUnit` chỉ được ghi lại. Vì vậy chưa có settlement nguyên tử (delivery-versus-payment, DvP) như mô tả ở báo cáo Giai đoạn 1. Mô hình DvP phổ biến chuyển tài sản và tiền trong cùng một giao dịch, thường dùng ERC-20 cho tiền và ERC-721/1155 cho tài sản, và hoàn tác toàn bộ nếu thiếu tiền [S2]. Cần bổ sung leg thanh toán (ví dụ ERC-20 test) trong cùng giao dịch. Lưu ý: các nguồn [S2] là tài liệu vendor/blog; chưa tìm thấy nguồn nào mô tả riêng một triển khai ERC-1155 DvP.
-2. Chữ ký EIP-712 chỉ được xác minh ngoài chuỗi; contract không kiểm tra. Toàn bộ niềm tin dồn vào `matchingAgentAddress`: tác tử này có thể bỏ sót lệnh, ưu tiên sai hoặc gửi cặp khớp không có thật mà contract không phát hiện. Nếu muốn giảm giả định tin cậy, contract cần xác minh chữ ký của buyer/seller và ràng buộc giá (`ask ≤ p ≤ bid`) on-chain.
-3. `settleMatchedTrade` là `onlyMatchingAgent`, nên Settlement Submitter chính là địa chỉ đó; quản lý khóa là việc của thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
-4. Thứ tự giao dịch on-chain vẫn chịu rủi ro MEV/front-running [R9]; chữ ký lệnh không loại bỏ rủi ro này.
+**Trạng thái đối chiếu với spec hợp đồng của Đức [D] (đã đọc bản v2, commit `3194bad`, branch `docs/smart-contract-spec`, chưa merge vào `main`):**
+- *Thanh toán nguyên tử:* bản `CarbonDoubleAuction.sol` hiện trên `main` chỉ chuyển token carbon, không có bước trả tiền; [D, §3.1] thiết kế một giao dịch chuyển cả token thanh toán ERC-20 lẫn token carbon và hoàn tác toàn bộ nếu thiếu. Mô hình này phù hợp với DvP thông dụng [S2] (nguồn vendor/blog, không có nguồn riêng cho ERC-1155). **Mã trong `contracts/` chưa được cập nhật theo [D]**, nên đến lúc đó phần thiết kế mới là kế hoạch, không phải hành vi đã có.
+- *Xác minh chữ ký và giá on-chain:* [D, §3.3] kiểm chữ ký EIP-712, `ask ≤ clearingPrice ≤ bid`, `filledAmount + matchAmount ≤ amount`. Điều này **giảm** giả định tin cậy vào engine: engine không thể gửi cặp khớp không có chữ ký, vượt giá hay vượt khối lượng. Phần còn lại engine có thể làm sai mà hợp đồng không phát hiện: bỏ sót hoặc ưu tiên sai lệnh hợp lệ (vi phạm công bằng thứ tự, không vi phạm điều kiện on-chain), chọn `clearingPrice` thiên lệch trong khoảng [ask, bid], và trì hoãn phiên.
+- *Quyền gọi:* [D] cần quy định rõ ai được gọi `settleMatchedTrade` (code `main` dùng `onlyMatchingAgent`); quản lý khóa của Settlement Submitter thuộc thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
+- *MEV/front-running:* thứ tự giao dịch on-chain vẫn chịu rủi ro [R9]; chữ ký lệnh không loại bỏ rủi ro này.
+- *Batch:* `batchSettleMatchedTrades` bọc từng cặp trong kiểm tra độc lập để một lệnh lỗi không chặn cả phiên [D, §4]; engine cần giới hạn kích thước batch theo gas (ước tính của [D, §5]: 10 cặp ≈ 920.000 gas — số liệu của Đức, chưa được kiểm chứng độc lập).
 
 ---
 
@@ -253,7 +269,7 @@ Kiểm tra sơ bộ bằng baseline hiện có (3 seed, 500 lệnh, giá khai = 
 - **Thí nghiệm B — tác tử khai giá chiến lược.** Cho tác tử shading giá (bid thấp hơn / ask cao hơn valuation) theo hàm phụ thuộc k (theo hướng mô hình [R4]) hoặc theo chiến lược thích nghi. Đo `welfare`, khối lượng khớp và tỷ lệ giao dịch bị mất so với benchmark khai trung thực. Chỉ ở thí nghiệm này k mới có thể ảnh hưởng đến welfare.
 
 **Hướng thiết kế cho thí nghiệm B:**
-- *Đối chứng giải tích (một mua – một bán, một đơn vị):* mô hình Chatterjee–Samuelson [R4] với valuation phân phối đều trên [0,1] và k = 1/2 có cân bằng Bayes tuyến tính; theo các nguồn thứ cấp [S4], bid = (2/3)v + 1/12, ask = (2/3)c + 1/4, nên giao dịch chỉ xảy ra khi v − c ≥ 1/4 và một phần giao dịch có lợi bị bỏ lỡ (hệ quả trực quan của bất khả thi Myerson–Satterthwaite [R7]). **Các hệ số này chưa được đối chiếu với bài gốc [R4]**; phải kiểm tra trước khi đưa vào báo cáo. Cân bằng của k-double auction không duy nhất, nên đây chỉ là một lựa chọn cân bằng. Nếu hệ số khớp, kết quả dùng làm bài kiểm tra tính đúng của mô phỏng (mô phỏng 1v1 phải tái tạo ngưỡng này).
+- *Đối chứng giải tích (một mua – một bán, một đơn vị):* mô hình Chatterjee–Samuelson [R4] với valuation phân phối đều trên [0,1] và k = 1/2 có cân bằng Bayes tuyến tính; theo các nguồn thứ cấp [S4], bid = (2/3)v + 1/12, ask = (2/3)c + 1/4, nên giao dịch chỉ xảy ra khi v − c ≥ 1/4 và một phần giao dịch có lợi bị bỏ lỡ (hệ quả trực quan của bất khả thi Myerson–Satterthwaite [R7]). Đối chiếu đến nay: (i) hai bài arXiv độc lập nêu cùng hệ số (arXiv:1207.4171 và arXiv:1210.5541), (ii) tính lại bằng tìm kiếm phản ứng tối ưu số trên lưới (bid ≈ 0,09 + 0,66v, ask ≈ 0,25 + 0,66c, sai lệch trong phạm vi độ phân giải lưới) — kết quả tuyến tính này đúng trên miền v ≥ 1/4; bên dưới đó chiến lược là từng đoạn tuyến tính. **Chưa đối chiếu với bài gốc [R4]** (chưa có toàn văn); cần kiểm tra trước khi trích trong báo cáo. Cân bằng của k-double auction không duy nhất, nên đây chỉ là một lựa chọn cân bằng. Nếu hệ số khớp, kết quả dùng làm bài kiểm tra tính đúng của mô phỏng (mô phỏng 1v1 phải tái tạo ngưỡng này).
 - *Nhiều lệnh, nhiều đơn vị (100–500 lệnh):* kết quả giải tích trên không áp dụng trực tiếp. Hướng dự kiến là tác tử học thích nghi kiểu Zero-Intelligence Plus (ZIP) [S5]; chưa tìm được nguồn về bid shading phụ thuộc k trong bối cảnh nhiều đơn vị, nên chiến lược cụ thể vẫn là câu hỏi mở (§11).
 
 > **Cần trao đổi với Huy/GVHD:** mô tả nhiệm vụ trên Google Doc ("so sánh social welfare giữa k = 0, 0.5, 1 để tìm tham số tối ưu") chỉ có nghĩa nếu có thí nghiệm B. Nên chỉnh lại câu chữ nhiệm vụ cho khớp.
@@ -303,7 +319,8 @@ Bất biến (theo mục 10.1 của đề cương nội bộ, tài liệu ngoài
 - Khối lượng mua khớp = khối lượng bán khớp; không lệnh nào khớp vượt `amount` gốc.
 - `ask ≤ clearing_price ≤ bid` cho mọi cặp (kể cả sau làm tròn tick, §3.3).
 - Lệnh `FILLED/CANCELLED/EXPIRED` không xuất hiện lại ở phiên sau.
-- Không `trade_hash` nào được gửi hai lần; engine tự kiểm tra trước khi gửi để tránh tốn gas cho giao dịch revert [R12].
+- Không cặp khớp nào được gửi hai lần: engine dùng khóa idempotency `trade_hash` (§3.2) và đối chiếu `filledAmount` on-chain trước khi gửi, để tránh tốn gas cho giao dịch revert [R12].
+- Mọi `clearingPrice` đưa lên chuỗi thỏa `ask ≤ clearingPrice ≤ bid` bằng số nguyên (nếu không, hợp đồng revert `PriceMismatch`).
 - Cùng snapshot → cùng kết quả.
 
 Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trống; bid < ask toàn bộ; bid = ask; nhiều lệnh cùng giá và tuổi (pro-rata + phần dư); lệnh khác tuổi cùng giá; partial fill; hủy sát cutoff; hết hạn; rollover nhiều phiên; trùng `order_id`; giá nhiều chữ số thập phân.
@@ -317,9 +334,12 @@ Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trốn
 3. Giá theo cặp hay giá chung của phiên (§7).
 4. `max_rollover_count`/TTL cho lệnh GTC.
 5. Thiết kế thí nghiệm B: chiến lược khai giá nào (ZIP hay hàm shading theo k), kiểm tra hệ số Chatterjee–Samuelson với bài gốc, và chỉnh lại câu chữ nhiệm vụ trên Google Doc.
-6. Tick giá và quy tắc làm tròn; quy đổi sang `uint256` on-chain (phối hợp với Đức).
-7. Thanh toán tiền trong `settleMatchedTrade` (§8.4, ý 1) và xác minh chữ ký/giá on-chain (§8.4, ý 2).
-8. Quản lý khóa của `matchingAgentAddress` và phương án khi tác tử ngừng hoạt động.
+6. **Đơn vị `amount`: kg CO2e hay tCO2e** (mâu thuẫn giữa [D] và báo cáo GĐ1; §3.3), cần chốt với Đức.
+7. Hướng làm tròn giá khớp nguyên (§3.3) và đơn vị `pricePerUnit` (wei của token thanh toán nào, bao nhiêu chữ số thập phân).
+8. `time_in_force` có đưa vào struct được ký không (§6.1).
+9. Ngữ nghĩa `nonce`/`incrementNonce` của [D]: tăng nonce vô hiệu hóa mọi lệnh cũ hay từng lệnh; ảnh hưởng tới lệnh GTC đang nằm trong sổ.
+10. Cập nhật `contracts/` theo [D] (hiện `main` chưa có bước thanh toán và xác minh chữ ký on-chain) và thứ tự merge branch của Đức.
+11. Quản lý khóa của Settlement Submitter, quyền gọi `settleMatchedTrade`, và phương án khi tác tử ngừng hoạt động.
 
 ---
 
@@ -332,6 +352,7 @@ Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trốn
 - **[R1]** Liu, X., et al. (2026). Blockchain and double auction for credible and efficient voluntary carbon market. *Applied Energy*, 412, 127719. — bài trực tiếp về VCM; chi tiết rule và rollover **chưa đọc toàn văn**, không dùng làm căn cứ cho khẳng định cụ thể ở tài liệu này.
 - **[R9]** Daian, P., et al. (2020). Flash Boys 2.0. *IEEE S&P*, 910–927. — MEV (§8.4).
 - **[R12]** Ethereum.org, *Gas and fees* — chi phí giao dịch revert (§10).
+- **[D]** Nguyễn Hoàng Đức, *Tài liệu đặc tả kỹ thuật Smart Contract*, `docs/SMART_CONTRACT_SPEC.md`, bản v2, commit `3194bad` (06/11/2026), branch `docs/smart-contract-spec` (chưa merge vào `main` tại thời điểm viết). Nguồn nội bộ của nhóm, chưa được kiểm toán độc lập; các số liệu gas trong đó chưa được kiểm chứng.
 - **[R7]** Myerson, R. B., & Satterthwaite, M. A. (1983). Efficient Mechanisms for Bilateral Trading. *Journal of Economic Theory*, 29(2), 265–281.
 
 Nguồn web bổ sung (truy cập 02/11/2026), đánh dấu mức độ tin cậy:
