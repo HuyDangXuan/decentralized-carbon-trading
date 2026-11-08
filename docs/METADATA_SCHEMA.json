@@ -1,0 +1,437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://epu-carbonchain.vn/schema/carbon-credit-metadata-v1.json",
+  "title": "EPU CarbonChain – Carbon Credit ERC-1155 Metadata Schema",
+  "description": "JSON Schema chuẩn hóa siêu dữ liệu tín chỉ carbon theo ERC-1155 Metadata URI, tương thích Verra VCS, Gold Standard và MRVVerificationAgent. Tài liệu dùng cho hàm uri(tokenId) trên CarbonCredit1155.sol.",
+  "type": "object",
+
+  "required": ["name", "description", "image", "properties"],
+
+  "properties": {
+
+    "name": {
+      "type": "string",
+      "description": "Tên hiển thị của lô tín chỉ. Định dạng: 'Carbon Credit - {project_name} ({vintage_year})'.",
+      "examples": [
+        "Carbon Credit - Dự án Trồng Rừng Phòng Hộ Tây Bắc (2026)"
+      ]
+    },
+
+    "description": {
+      "type": "string",
+      "description": "Mô tả ngắn gọn về tín chỉ, bao gồm tiêu chuẩn áp dụng.",
+      "examples": [
+        "Verified Carbon Credit under standard Verra VCS + CCB"
+      ]
+    },
+
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI ảnh đại diện dự án trên IPFS (CID v1 hoặc v0).",
+      "pattern": "^ipfs://",
+      "examples": [
+        "ipfs://bafybeihdwdcefgh4dqkjv678projectcoverimage"
+      ]
+    },
+
+    "decimals": {
+      "type": "integer",
+      "default": 0,
+      "description": "Số chữ số thập phân theo chuẩn ERC-1155. Tín chỉ carbon tính theo tấn nguyên (tCO2e), mặc định = 0."
+    },
+
+    "properties": {
+      "type": "object",
+      "description": "Tập hợp thuộc tính mở rộng chứa toàn bộ thông tin nghiệp vụ MRV, Verra VCS và Gold Standard.",
+      "required": [
+        "project_id",
+        "standard",
+        "vintage_year",
+        "total_issued_tCO2e",
+        "developer",
+        "verifier",
+        "verified_at",
+        "status"
+      ],
+
+      "properties": {
+
+        "project_id": {
+          "type": "string",
+          "description": "Mã định danh duy nhất của dự án. Tuân thủ quy ước: {QUỐC GIA}-{LOẠI}-{NĂM}-{SỐ THỨ TỰ}. Ví dụ Verra: 'VCS-1234', Gold Standard: 'GS-5678'.",
+          "pattern": "^[A-Z]{2,3}-[A-Z]{2,5}-[0-9]{4}-[0-9]{3,6}$|^VCS-[0-9]+$|^GS-[0-9]+$",
+          "examples": [
+            "VN-FOR-2026-001",
+            "VCS-2345",
+            "GS-6789"
+          ]
+        },
+
+        "standard": {
+          "type": "string",
+          "description": "Tiêu chuẩn chứng nhận tín chỉ carbon áp dụng.",
+          "enum": [
+            "Verra VCS",
+            "Verra VCS + CCB",
+            "Verra VCS + SD VISta",
+            "Gold Standard VER",
+            "Gold Standard CER",
+            "CDM",
+            "Vietnam VCM",
+            "Article 6.4"
+          ]
+        },
+
+        "methodology": {
+          "type": "string",
+          "description": "Phương pháp luận tính toán giảm phát thải (Methodology). Verra: VM0007, VM0015, VM0042… Gold Standard: GS-METH-001…",
+          "examples": [
+            "VM0007 - REDD+ Methodology Framework",
+            "VM0015 - Avoided Unplanned Deforestation",
+            "VM0042 - Improved Cookstoves",
+            "GS-TPDDTEC - Technologies and Practices to Displace Decentralized Thermal Energy Consumption"
+          ]
+        },
+
+        "project_type": {
+          "type": "string",
+          "description": "Phân loại lĩnh vực dự án theo Verra Sectoral Scope hoặc Gold Standard Project Type.",
+          "enum": [
+            "FORESTRY_AFOLU",
+            "RENEWABLE_ENERGY",
+            "ENERGY_EFFICIENCY",
+            "COOKSTOVE",
+            "WASTE_MANAGEMENT",
+            "TRANSPORT",
+            "INDUSTRIAL_GAS",
+            "BLUE_CARBON",
+            "AGRICULTURE",
+            "OTHER"
+          ]
+        },
+
+        "vintage_year": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100,
+          "description": "Năm vintage – năm mà lượng giảm phát thải thực sự xảy ra (không phải năm phát hành)."
+        },
+
+        "vintage_period": {
+          "type": "object",
+          "description": "Khoảng thời gian giám sát cụ thể của đợt vintage (Monitoring Period).",
+          "properties": {
+            "start_date": {
+              "type": "string",
+              "format": "date",
+              "description": "Ngày bắt đầu chu kỳ giám sát (ISO 8601)."
+            },
+            "end_date": {
+              "type": "string",
+              "format": "date",
+              "description": "Ngày kết thúc chu kỳ giám sát (ISO 8601)."
+            }
+          },
+          "required": ["start_date", "end_date"]
+        },
+
+        "total_issued_tCO2e": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Tổng số tín chỉ carbon được phê duyệt phát hành trong đợt này (đơn vị: tấn CO2 tương đương – tCO2e)."
+        },
+
+        "serial_number_range": {
+          "type": "object",
+          "description": "Dải số serial theo quy định Verra Registry hoặc Gold Standard Impact Registry.",
+          "properties": {
+            "start": {
+              "type": "string",
+              "description": "Số serial bắt đầu.",
+              "examples": ["VCS-123-2026-VN-FOR-001-1"]
+            },
+            "end": {
+              "type": "string",
+              "description": "Số serial kết thúc.",
+              "examples": ["VCS-123-2026-VN-FOR-001-5000"]
+            }
+          },
+          "required": ["start", "end"]
+        },
+
+        "country": {
+          "type": "string",
+          "description": "Mã quốc gia nơi dự án triển khai (ISO 3166-1 alpha-2).",
+          "pattern": "^[A-Z]{2}$",
+          "default": "VN",
+          "examples": ["VN", "ID", "BR", "IN"]
+        },
+
+        "region": {
+          "type": "string",
+          "description": "Khu vực / tỉnh thành cụ thể nơi dự án triển khai.",
+          "examples": ["Sơn La", "Lào Cai", "Đắk Lắk"]
+        },
+
+        "coordinates": {
+          "type": "object",
+          "description": "Tọa độ GPS trung tâm vùng dự án.",
+          "properties": {
+            "latitude": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          },
+          "required": ["latitude", "longitude"]
+        },
+
+        "developer": {
+          "type": "string",
+          "description": "Địa chỉ ví Ethereum (hoặc tên tổ chức) của chủ dự án / bên phát triển.",
+          "examples": [
+            "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+            "Vietnam Forest Corporation"
+          ]
+        },
+
+        "developer_name": {
+          "type": "string",
+          "description": "Tên đầy đủ tổ chức phát triển dự án.",
+          "examples": ["Công ty TNHH Trồng Rừng Xanh Tây Bắc"]
+        },
+
+        "verifier": {
+          "type": "string",
+          "description": "Tên đơn vị thẩm tra/kiểm định (VVB – Validation/Verification Body) hoặc ID tác tử tự động.",
+          "examples": [
+            "EPU_Decentralized_Carbon_Auditor",
+            "SCS Global Services",
+            "TÜV SÜD"
+          ]
+        },
+
+        "verification_body_id": {
+          "type": "string",
+          "description": "Mã định danh VVB trên registry (nếu có).",
+          "examples": ["VVB-0042"]
+        },
+
+        "verified_at": {
+          "type": "integer",
+          "description": "Unix timestamp (giây) thời điểm MRV Agent hoàn tất thẩm tra. Tương thích với trường verified_at trong MRVVerificationAgent.",
+          "examples": [1730000000]
+        },
+
+        "verification_report_uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "URI trỏ tới bản báo cáo thẩm tra đầy đủ lưu trên IPFS.",
+          "pattern": "^ipfs://",
+          "examples": [
+            "ipfs://QmVerificationReportHash1234567890abcdef"
+          ]
+        },
+
+        "status": {
+          "type": "string",
+          "description": "Trạng thái hiện tại của lô tín chỉ trên hệ thống CarbonChain.",
+          "enum": [
+            "PENDING_VERIFICATION",
+            "VERIFIED_ACTIVE",
+            "LISTED_FOR_SALE",
+            "PARTIALLY_RETIRED",
+            "FULLY_RETIRED",
+            "SUSPENDED",
+            "CANCELLED"
+          ],
+          "default": "VERIFIED_ACTIVE"
+        },
+
+        "retirement_details": {
+          "type": "object",
+          "description": "Thông tin tiêu hủy (chỉ có khi status là PARTIALLY_RETIRED hoặc FULLY_RETIRED). Tương thích với RetirementComplianceAgent.",
+          "properties": {
+            "retired_amount_tCO2e": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Số lượng tín chỉ đã tiêu hủy vĩnh viễn."
+            },
+            "beneficiary_company": {
+              "type": "string",
+              "description": "Tên doanh nghiệp hưởng thụ quyền bù đắp."
+            },
+            "retirement_reason": {
+              "type": "string",
+              "description": "Lý do / mục đích tiêu hủy tín chỉ.",
+              "examples": ["Bù đắp phát thải Scope 1 - Quý 4/2026"]
+            },
+            "retirement_timestamp": {
+              "type": "integer",
+              "description": "Unix timestamp thời điểm tiêu hủy."
+            },
+            "certificate_hash": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{64}$",
+              "description": "Mã hash SHA-256 chứng nhận ESG bất biến trên blockchain."
+            }
+          }
+        },
+
+        "sdg_contributions": {
+          "type": "array",
+          "description": "Danh sách các Mục tiêu Phát triển Bền vững (SDGs) mà dự án đóng góp. Bắt buộc với Gold Standard, khuyến nghị với Verra VCS + SD VISta.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sdg_number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 17,
+                "description": "Số thứ tự SDG (1-17)."
+              },
+              "sdg_name": {
+                "type": "string",
+                "description": "Tên SDG."
+              },
+              "contribution_description": {
+                "type": "string",
+                "description": "Mô tả ngắn gọn đóng góp cụ thể."
+              }
+            },
+            "required": ["sdg_number"]
+          },
+          "examples": [
+            [
+              {"sdg_number": 13, "sdg_name": "Climate Action", "contribution_description": "Giảm 5000 tCO2e/năm qua trồng rừng"},
+              {"sdg_number": 15, "sdg_name": "Life on Land", "contribution_description": "Phục hồi 200ha rừng phòng hộ"}
+            ]
+          ]
+        },
+
+        "additionality": {
+          "type": "string",
+          "description": "Kết quả đánh giá tính bổ sung (Additionality Assessment) – dự án chỉ khả thi nhờ cơ chế tín chỉ carbon.",
+          "enum": ["PROVEN", "CONDITIONAL", "NOT_ASSESSED"]
+        },
+
+        "permanence_risk_buffer": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Phần trăm tín chỉ trích lập vào quỹ đệm rủi ro phi vĩnh cửu (Non-Permanence Risk Buffer) theo Verra AFOLU. Thường 10-40%."
+        },
+
+        "corresponding_adjustment": {
+          "type": "boolean",
+          "default": false,
+          "description": "Đánh dấu tín chỉ đã được điều chỉnh tương ứng (Corresponding Adjustment) theo Điều 6 Thỏa thuận Paris, tránh double counting giữa các quốc gia."
+        },
+
+        "content_hash": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{64}$",
+          "description": "Mã hash SHA-256 của toàn bộ metadata JSON (trước khi thêm trường này). Dùng để xác minh tính toàn vẹn on-chain. Sinh bởi MRVVerificationAgent.",
+          "examples": ["0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"]
+        }
+      },
+
+      "additionalProperties": true
+    }
+  },
+
+  "additionalProperties": false,
+
+  "$defs": {
+    "example_verra_vcs": {
+      "description": "Ví dụ metadata đầy đủ tuân thủ Verra VCS – tương thích đầu ra MRVVerificationAgent",
+      "const": {
+        "name": "Carbon Credit - Dự án Trồng Rừng Phòng Hộ Tây Bắc (2026)",
+        "description": "Verified Carbon Credit under standard Verra VCS + CCB",
+        "image": "ipfs://bafybeihdwdcefgh4dqkjv678projectcoverimage",
+        "decimals": 0,
+        "properties": {
+          "project_id": "VN-FOR-2026-001",
+          "standard": "Verra VCS + CCB",
+          "methodology": "VM0015 - Avoided Unplanned Deforestation",
+          "project_type": "FORESTRY_AFOLU",
+          "vintage_year": 2026,
+          "vintage_period": {
+            "start_date": "2026-01-01",
+            "end_date": "2026-12-31"
+          },
+          "total_issued_tCO2e": 5000,
+          "serial_number_range": {
+            "start": "VCS-2026-VN-FOR-001-00001",
+            "end": "VCS-2026-VN-FOR-001-05000"
+          },
+          "country": "VN",
+          "region": "Sơn La",
+          "coordinates": {
+            "latitude": 21.3269,
+            "longitude": 103.9188
+          },
+          "developer": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+          "developer_name": "Công ty TNHH Trồng Rừng Xanh Tây Bắc",
+          "verifier": "EPU_Decentralized_Carbon_Auditor",
+          "verified_at": 1730000000,
+          "verification_report_uri": "ipfs://QmVerifReport1234abcdef567890",
+          "status": "VERIFIED_ACTIVE",
+          "sdg_contributions": [
+            {"sdg_number": 13, "sdg_name": "Climate Action", "contribution_description": "Giảm 5000 tCO2e/năm"},
+            {"sdg_number": 15, "sdg_name": "Life on Land", "contribution_description": "Phục hồi 200ha rừng"}
+          ],
+          "additionality": "PROVEN",
+          "permanence_risk_buffer": 20,
+          "corresponding_adjustment": false,
+          "content_hash": "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
+        }
+      }
+    },
+
+    "example_gold_standard": {
+      "description": "Ví dụ metadata tuân thủ Gold Standard VER",
+      "const": {
+        "name": "Carbon Credit - Chương trình Bếp Sạch Cộng đồng Mekong (2026)",
+        "description": "Verified Carbon Credit under standard Gold Standard VER",
+        "image": "ipfs://bafybeigoldstandardprojectimage",
+        "decimals": 0,
+        "properties": {
+          "project_id": "GS-9012",
+          "standard": "Gold Standard VER",
+          "methodology": "GS-TPDDTEC - Technologies and Practices to Displace Decentralized Thermal Energy Consumption",
+          "project_type": "COOKSTOVE",
+          "vintage_year": 2026,
+          "vintage_period": {
+            "start_date": "2026-01-01",
+            "end_date": "2026-06-30"
+          },
+          "total_issued_tCO2e": 12000,
+          "country": "VN",
+          "region": "Đồng bằng Sông Cửu Long",
+          "developer": "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+          "developer_name": "Tổ chức Bếp Sạch Mekong",
+          "verifier": "SCS Global Services",
+          "verification_body_id": "VVB-0042",
+          "verified_at": 1732000000,
+          "status": "VERIFIED_ACTIVE",
+          "sdg_contributions": [
+            {"sdg_number": 3, "sdg_name": "Good Health and Well-being", "contribution_description": "Giảm ô nhiễm không khí trong nhà"},
+            {"sdg_number": 5, "sdg_name": "Gender Equality", "contribution_description": "Giảm thời gian nấu nướng cho phụ nữ"},
+            {"sdg_number": 7, "sdg_name": "Affordable and Clean Energy", "contribution_description": "Bếp cải tiến tiết kiệm 60% nhiên liệu"},
+            {"sdg_number": 13, "sdg_name": "Climate Action", "contribution_description": "Giảm 12000 tCO2e/năm"}
+          ],
+          "additionality": "PROVEN",
+          "corresponding_adjustment": true,
+          "content_hash": "0xb2c3d4e5f6a7890123456789012345678901abcdef234567890abcdef1234567"
+        }
+      }
+    }
+  }
+}
