@@ -66,9 +66,11 @@ def parse_k_list(value: str) -> list[float]:
             val = float(p)
         except ValueError:
             raise argparse.ArgumentTypeError(f"Giá trị k không hợp lệ: '{p}'")
-        if val < 0.0 or val > 1.0:
+        if not (0.0 <= val <= 1.0):
             raise argparse.ArgumentTypeError(f"k phải thuộc [0, 1], nhận được {val}")
         k_list.append(val)
+    if len(set(k_list)) != len(k_list):
+        raise argparse.ArgumentTypeError("Danh sách k có giá trị trùng nhau.")
     return k_list
 
 
@@ -92,6 +94,8 @@ def parse_n_list(value: str) -> list[int]:
         if val < 2:
             raise argparse.ArgumentTypeError(f"n phải >= 2, nhận được {val}")
         n_list.append(val)
+    if len(set(n_list)) != len(n_list):
+        raise argparse.ArgumentTypeError("Danh sách n có giá trị trùng nhau.")
     return n_list
 
 

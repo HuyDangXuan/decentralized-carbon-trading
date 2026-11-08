@@ -159,6 +159,31 @@ class TestRunExperimentA(unittest.TestCase):
             main(["a", "--k", ""])
         self.assertEqual(cm.exception.code, 2)
 
+        # Hồi quy (review chéo): NaN và giá trị trùng phải bị từ chối
+        for bad in ("nan", "inf", "0,0,1", "0.5,0.5"):
+            with self.assertRaises(SystemExit, msg=bad) as cm:
+                main(["a", "--k", bad])
+            self.assertEqual(cm.exception.code, 2, bad)
+        with self.assertRaises(SystemExit) as cm:
+            main(["a", "--n", "50,50"])
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_summary_std_is_sample_std_and_half_k_is_near_half(self):
+        """Hồi quy (review chéo): std mẫu (n-1) khớp tính tay; k=0.5 cho buyer_share ~ 0.5."""
+        import statistics
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_path = Path(tmp_dir)
+            self.assertEqual(main(["a", "--n", "100", "--runs", "5", "--out", str(temp_path)]), 0)
+            with open(temp_path / "exp_a_raw.csv", encoding="utf-8") as f:
+                raw = [r for r in csv.DictReader(f) if float(r["k"]) == 0.5]
+            with open(temp_path / "exp_a_summary.csv", encoding="utf-8") as f:
+                summ = [r for r in csv.DictReader(f) if float(r["k"]) == 0.5][0]
+            welfares = [float(r["welfare"]) for r in raw]
+            self.assertAlmostEqual(float(summ["welfare_std"]), statistics.stdev(welfares), places=4)
+            self.assertNotAlmostEqual(float(summ["welfare_std"]), statistics.pstdev(welfares), places=4)
+            self.assertAlmostEqual(float(summ["buyer_share_mean"]), 0.5, delta=1e-3)
+
     def test_invalid_n_and_runs_arguments_exit_code_2(self):
         """Tham số n < 2, runs < 1, danh sách rỗng -> argparse lỗi, mã thoát 2."""
         # n < 2
