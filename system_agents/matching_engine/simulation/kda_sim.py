@@ -481,3 +481,125 @@ def deviator_utility(
 
     # Trường hợp mảng kịch bản
     return _eval_single(np.asarray(bid_fn_or_grid))
+
+
+def deviator_outcome(
+    V: np.ndarray,
+    C: np.ndarray,
+    strategy: Any,
+    k: float,
+    rule: str,
+    side: str,
+    price_grid: Sequence[float] | np.ndarray,
+    tick: float | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Tính xác suất giao dịch W và khoản thanh toán kỳ vọng P trên lưới giá khai.
+
+    Người lệch là người 0 phía `side` (valuation/cost cột 0 của V/C KHÔNG được dùng).
+    Các người chơi còn lại (cột 1..m-1 phía đó và toàn bộ phía kia) chơi `strategy`.
+    Dùng chung toàn bộ kịch bản (V, C) để triệt tiêu phương sai (common random numbers).
+
+    Tiện ích kỳ vọng của người lệch khi có valuation v (người mua) hoặc cost c (người bán):
+      Người mua: U(v, b) = v * W(b) - P(b)
+      Người bán: U(c, a) = P(a) - c * W(a)
+
+    Args:
+        V: Mảng valuation người mua, hình dạng (n_scen, m).
+        C: Mảng chi phí người bán, hình dạng (n_scen, m).
+        strategy: Chiến lược của các người chơi khác ((bid_knots, ask_knots) hoặc theta).
+        k: Hệ số đấu giá k-DA, thuộc (0, 1].
+        rule: Quy tắc định giá ("pair", "marginal", "kda").
+        side: Phía của người lệch ("buy" / "bid" hoặc "sell" / "ask").
+        price_grid: Lưới giá khai cần đánh giá (1D sequence hoặc ndarray).
+        tick: Bước giá làm tròn (None nếu liên tục).
+
+    Returns:
+        tuple (win_prob, exp_pay):
+          win_prob: Mảng 1D xác suất khớp lệnh W(price) tương ứng từng giá trên price_grid.
+          exp_pay: Mảng 1D khoản trả/nhận kỳ vọng P(price) tương ứng từng giá trên price_grid.
+
+    Raises:
+        ValueError: Nếu k, rule, side hoặc strategy không hợp lệ.
+    """
+    if not (0.0 < k <= 1.0):
+        raise ValueError(f"k phải thuộc (0, 1], nhận được {k}")
+    if rule not in ("pair", "marginal", "kda"):
+        raise ValueError(f"rule phải là 'pair', 'marginal', hoặc 'kda', nhận được '{rule}'")
+
+    if isinstance(strategy, (tuple, list)) and len(strategy) == 4 and all(
+        isinstance(x, (int, float, np.floating, np.integer)) for x in strategy
+    ):
+        bid_knots, ask_knots = theta_to_strategy(strategy)
+    elif isinstance(strategy, (tuple, list)) and len(strategy) == 2:
+        bid_knots, ask_knots = strategy
+    else:
+        raise ValueError("strategy phải là (bid_knots, ask_knots) hoặc tuple 4 tham số theta")
+
+    side_lower = side.lower()
+    is_buyer = side_lower in ("buy", "bid", "buyer")
+    is_seller = side_lower in ("sell", "ask", "seller")
+    if not (is_buyer or is_seller):
+        raise ValueError(f"side phải là 'buy'/'bid' hoặc 'sell'/'ask', nhận được '{side}'")
+
+    n_scen, m = V.shape
+    bids = apply_strategy(V, bid_knots, side="bid")
+    asks = apply_strategy(C, ask_knots, side="ask")
+
+    grid_arr = np.asarray(price_grid, dtype=float)
+    n_grid = len(grid_arr)
+
+    win_prob = np.zeros(n_grid, dtype=float)
+    exp_pay = np.zeros(n_grid, dtype=float)
+    row_idx = np.arange(n_scen)
+
+    for g in range(n_grid):
+        p_val = float(grid_arr[g])
+        if is_buyer:
+            bids[:, 0] = p_val
+            clear_res = clear(bids, asks, k=k, rule=rule, tick=tick)
+            m_star = clear_res["m_star"]
+
+            if tick is not None and tick > 0:
+                bids_snapped = np.round(bids / tick) * tick
+            else:
+                bids_snapped = bids
+            order_b = np.argsort(-bids_snapped, axis=-1, kind="stable")
+            rank0 = np.where(order_b == 0)[1]
+            matched0 = rank0 < m_star
+
+            if rule == "pair":
+                asks_sorted = clear_res["asks_sorted"]
+                p_dev = k * p_val + (1.0 - k) * asks_sorted[row_idx, np.minimum(rank0, m - 1)]
+                if tick is not None and tick > 0:
+                    p_dev = np.round(p_dev / tick) * tick
+            else:
+                p_dev = clear_res["clearing_price"]
+
+            win_prob[g] = float(np.mean(matched0))
+            exp_pay[g] = float(np.mean(np.where(matched0, p_dev, 0.0)))
+        else:
+            asks[:, 0] = p_val
+            clear_res = clear(bids, asks, k=k, rule=rule, tick=tick)
+            m_star = clear_res["m_star"]
+
+            if tick is not None and tick > 0:
+                asks_snapped = np.round(asks / tick) * tick
+            else:
+                asks_snapped = asks
+            order_a = np.argsort(asks_snapped, axis=-1, kind="stable")
+            rank0 = np.where(order_a == 0)[1]
+            matched0 = rank0 < m_star
+
+            if rule == "pair":
+                bids_sorted = clear_res["bids_sorted"]
+                p_dev = k * bids_sorted[row_idx, np.minimum(rank0, m - 1)] + (1.0 - k) * p_val
+                if tick is not None and tick > 0:
+                    p_dev = np.round(p_dev / tick) * tick
+            else:
+                p_dev = clear_res["clearing_price"]
+
+            win_prob[g] = float(np.mean(matched0))
+            exp_pay[g] = float(np.mean(np.where(matched0, p_dev, 0.0)))
+
+    return win_prob, exp_pay
+

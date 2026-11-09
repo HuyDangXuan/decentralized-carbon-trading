@@ -389,6 +389,93 @@ class TestKDASim(unittest.TestCase):
         with self.assertRaises(ValueError):
             clear(bids, asks, k=1.5, rule="kda")
 
+    def test_deviator_outcome_identity(self):
+        """Bắt buộc J3 (i): deviator_utility == v*W - P trong 1e-12 cho ba rule, cả hai phía."""
+        from kda_sim import deviator_outcome
+
+        V, C = draw_scenarios(m=4, n_scen=500, seed=42)
+        strat = cs_theta(0.5)
+
+        # Kiểm tra phía người mua: U = v*W(b) - P(b)
+        test_buyer_cases = [(0.8, 0.6), (0.5, 0.3), (0.9, 0.9), (0.4, 0.2)]
+        b_grid = np.array([b for _, b in test_buyer_cases])
+
+        for rule in ("pair", "marginal", "kda"):
+            W_b, P_b = deviator_outcome(V, C, strat, k=0.5, rule=rule, side="buy", price_grid=b_grid)
+            for idx, (v_val, b_val) in enumerate(test_buyer_cases):
+                V2 = V.copy()
+                V2[:, 0] = v_val
+                u_exact = deviator_utility(V2, C, strat, k=0.5, rule=rule, side="buy", bid_fn_or_grid=b_val)
+                u_formula = v_val * W_b[idx] - P_b[idx]
+                self.assertAlmostEqual(
+                    u_exact,
+                    u_formula,
+                    delta=1e-12,
+                    msg=f"Lệch identity buyer tại rule={rule}, v={v_val}, b={b_val}",
+                )
+
+        # Kiểm tra phía người bán: U = P(a) - c*W(a)
+        test_seller_cases = [(0.2, 0.4), (0.5, 0.7), (0.1, 0.1), (0.6, 0.8)]
+        a_grid = np.array([a for _, a in test_seller_cases])
+
+        for rule in ("pair", "marginal", "kda"):
+            W_s, P_s = deviator_outcome(V, C, strat, k=0.5, rule=rule, side="sell", price_grid=a_grid)
+            for idx, (c_val, a_val) in enumerate(test_seller_cases):
+                C2 = C.copy()
+                C2[:, 0] = c_val
+                u_exact = deviator_utility(V, C2, strat, k=0.5, rule=rule, side="sell", bid_fn_or_grid=a_val)
+                u_formula = P_s[idx] - c_val * W_s[idx]
+                self.assertAlmostEqual(
+                    u_exact,
+                    u_formula,
+                    delta=1e-12,
+                    msg=f"Lệch identity seller tại rule={rule}, c={c_val}, a={a_val}",
+                )
+
+    def test_deviator_outcome_monotonicity(self):
+        """Bắt buộc J3 (ii): W đơn điệu không giảm theo b (mua) và không tăng theo a (bán)."""
+        from kda_sim import deviator_outcome
+
+        V, C = draw_scenarios(m=4, n_scen=1000, seed=123)
+        strat = cs_theta(0.5)
+        grid = np.linspace(0.0, 1.0, 41)
+
+        for rule in ("pair", "marginal", "kda"):
+            W_buy, _ = deviator_outcome(V, C, strat, k=0.5, rule=rule, side="buy", price_grid=grid)
+            diff_buy = np.diff(W_buy)
+            self.assertTrue(
+                np.all(diff_buy >= -1e-12),
+                msg=f"W_buy không đơn điệu tăng tại rule={rule}, min diff={np.min(diff_buy)}",
+            )
+
+            W_sell, _ = deviator_outcome(V, C, strat, k=0.5, rule=rule, side="sell", price_grid=grid)
+            diff_sell = np.diff(W_sell)
+            self.assertTrue(
+                np.all(diff_sell <= 1e-12),
+                msg=f"W_sell không đơn điệu giảm tại rule={rule}, max diff={np.max(diff_sell)}",
+            )
+
+    def test_deviator_outcome_performance(self):
+        """Tiêu chí chấp nhận (5): deviator_outcome m=16, n_scen=20000, lưới 81 dưới 5s."""
+        from kda_sim import deviator_outcome
+
+        V, C = draw_scenarios(m=16, n_scen=20000, seed=7777)
+        strat = cs_theta(0.5)
+        grid = np.linspace(0.0, 1.0, 81)
+
+        t_start = time.perf_counter()
+        W, P = deviator_outcome(V, C, strat, k=0.5, rule="kda", side="buy", price_grid=grid)
+        elapsed = time.perf_counter() - t_start
+
+        self.assertEqual(len(W), 81)
+        self.assertEqual(len(P), 81)
+        self.assertLess(
+            elapsed,
+            5.0,
+            msg=f"deviator_outcome chạy quá 5 giây ({elapsed:.4f}s) tại m=16, n_scen=20000, grid=81",
+        )
+        print(f"\n[PERF] deviator_outcome m=16, n_scen=20000, grid=81 hoàn thành trong {elapsed:.4f}s")
+
 
 if __name__ == "__main__":
     unittest.main()
