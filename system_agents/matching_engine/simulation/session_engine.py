@@ -292,3 +292,106 @@ def match_session(
                 cur_rem_a = ask_alloc[matched_asks[idx_a].order_id]
 
     return fills
+
+
+def end_session(
+    orders: list[BookOrder],
+    fills: list[Fill],
+    max_rollover: int = 3,
+) -> list[tuple[str, str, Optional[BookOrder]]]:
+    """Kết thúc phiên đấu giá kép, cập nhật trạng thái lệnh còn dư và thực hiện rollover.
+
+    Ngữ nghĩa: Lệnh GTC sống tối đa max_rollover + 1 phiên.
+
+    Quy tắc:
+    - Mỗi lệnh đầu vào trừ tổng amount đã khớp (theo bid_id / ask_id).
+    - Trả về danh sách tuple (order_id, status, order_mới) sắp theo order_id tăng dần:
+      + Hết khối lượng: status = "FILLED", order_mới = None.
+      + Còn dư, tif == "IOC": status = "CANCELLED", order_mới = None.
+      + Còn dư, tif == "GTC", sessions_alive + 1 <= max_rollover:
+        status = "ROLLED_OVER", order_mới là BookOrder mới với remaining = remaining mới
+        và sessions_alive = sessions_alive + 1.
+      + Còn dư, tif == "GTC", sessions_alive + 1 > max_rollover:
+        status = "EXPIRED", order_mới = None.
+
+    Ngoại lệ:
+    - ValueError nếu:
+      + max_rollover < 0
+      + trùng order_id trong orders
+      + order_id trong fill không tồn tại trong orders
+      + bid_id trong fill không trỏ tới lệnh BID
+      + ask_id trong fill không trỏ tới lệnh ASK
+      + fill amount <= 0
+      + tổng khối lượng khớp của một lệnh vượt remaining của lệnh đó.
+    """
+    if max_rollover < 0:
+        raise ValueError(f"max_rollover must be >= 0, got {max_rollover}")
+
+    seen_ids = set()
+    order_map: dict[str, BookOrder] = {}
+    for o in orders:
+        if o.order_id in seen_ids:
+            raise ValueError(f"Duplicate order_id: {o.order_id}")
+        seen_ids.add(o.order_id)
+        if o.price_ticks <= 0:
+            raise ValueError(f"price_ticks must be > 0, got {o.price_ticks}")
+        if o.remaining <= 0:
+            raise ValueError(f"remaining must be > 0, got {o.remaining}")
+        if o.side not in ("BID", "ASK"):
+            raise ValueError(f"Invalid side: {o.side}")
+        if o.tif not in ("GTC", "IOC"):
+            raise ValueError(f"Invalid tif: {o.tif}")
+        if o.sessions_alive < 0:
+            raise ValueError(f"sessions_alive must be >= 0, got {o.sessions_alive}")
+        order_map[o.order_id] = o
+
+    matched_amounts: dict[str, int] = {o.order_id: 0 for o in orders}
+
+    for f in fills:
+        if f.amount <= 0:
+            raise ValueError(f"Fill amount must be > 0, got {f.amount}")
+        if f.bid_id not in order_map:
+            raise ValueError(f"Unknown bid_id: {f.bid_id}")
+        if order_map[f.bid_id].side != "BID":
+            raise ValueError(
+                f"bid_id {f.bid_id} points to side {order_map[f.bid_id].side}, expected BID"
+            )
+        if f.ask_id not in order_map:
+            raise ValueError(f"Unknown ask_id: {f.ask_id}")
+        if order_map[f.ask_id].side != "ASK":
+            raise ValueError(
+                f"ask_id {f.ask_id} points to side {order_map[f.ask_id].side}, expected ASK"
+            )
+
+        matched_amounts[f.bid_id] += f.amount
+        matched_amounts[f.ask_id] += f.amount
+
+    for o in orders:
+        if matched_amounts[o.order_id] > o.remaining:
+            raise ValueError(
+                f"Matched amount {matched_amounts[o.order_id]} exceeds remaining {o.remaining} for order {o.order_id}"
+            )
+
+    results: list[tuple[str, str, Optional[BookOrder]]] = []
+    for o in orders:
+        rem = o.remaining - matched_amounts[o.order_id]
+        if rem == 0:
+            results.append((o.order_id, "FILLED", None))
+        elif o.tif == "IOC":
+            results.append((o.order_id, "CANCELLED", None))
+        elif o.sessions_alive + 1 <= max_rollover:
+            new_order = BookOrder(
+                order_id=o.order_id,
+                side=o.side,
+                price_ticks=o.price_ticks,
+                remaining=rem,
+                sessions_alive=o.sessions_alive + 1,
+                seq=o.seq,
+                tif=o.tif,
+            )
+            results.append((o.order_id, "ROLLED_OVER", new_order))
+        else:
+            results.append((o.order_id, "EXPIRED", None))
+
+    results.sort(key=lambda item: item[0])
+    return results
