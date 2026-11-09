@@ -8,7 +8,7 @@ Cập nhật: 10/11/2026 (Giai đoạn 2, tuần 2). Branch: `auction-algorithm-
 |---|---|---|
 | **25/11, Spec Matching Engine và API** | **Hoàn thành về nội dung** (12 mục; đã review chéo bằng Opus 4.6, Opus 5.5 và hai vòng Argon; đã đối chiếu spec hợp đồng của Đức). Đang ở chế độ "bản thiết kế chờ nhóm chốt". | Nhóm chốt các quyết định mở (§11 của spec; danh sách ở file trao đổi); push spec lên branch để Huy xem. |
 | **10/12, Script mô phỏng 100–500 lệnh** | Có kết quả A, B1, B2 và thí nghiệm C (cân bằng, 24 cấu hình, m = 2…16) ở mức **sơ bộ**; engine tham chiếu số nguyên có test. | Báo cáo kết quả cuối; nhiều đơn vị mỗi lệnh và m > 16 nếu muốn; đọc toàn văn hai bài gốc còn lại. |
-| **05/12, Phối hợp với Đức (hợp đồng, EIP-712)** | Đã đối chiếu hai spec và lập danh sách 13 điểm (Đ1–Đ13). | **Cần trao đổi trực tiếp với Đức**; chưa có phản hồi. |
+| **05/12, Phối hợp với Đức (hợp đồng, EIP-712)** | Đã đối chiếu hai spec và lập danh sách 15 điểm (Đ1–Đ15). | **Cần trao đổi trực tiếp với Đức**; chưa có phản hồi. |
 | Tuần 5–8, test case và threat modeling | Phần lớn kịch bản test §10 đã có trong `test_session_engine.py`. | Test lớp API, đồng bộ `filledAmount` on-chain, threat modeling. |
 
 Mã và tài liệu nằm trên branch `auction-algorithm-engineer`; một số commit mới **chưa được push** (chỉ push khi người phụ trách bảo, và chỉ lên branch này, không lên `main`).
@@ -17,7 +17,7 @@ Mã và tài liệu nằm trên branch `auction-algorithm-engineer`; một số 
 
 | Hạng mục theo bảng Giai đoạn 2 | Hạn | Tình trạng | Sản phẩm |
 |---|---|---|---|
-| Thiết kế logic Matching Engine và đặc tả API Service | 25/11 | **Bản đầy đủ, đã cập nhật 10/11 theo bài gốc; chờ nhóm chốt các quyết định mở và điền kết quả thí nghiệm C** | [`MATCHING_ENGINE_SPEC.md`](MATCHING_ENGINE_SPEC.md) |
+| Thiết kế logic Matching Engine và đặc tả API Service | 25/11 | **Bản đầy đủ, đã cập nhật 10/11 theo bài gốc; chờ nhóm chốt các quyết định mở** | [`MATCHING_ENGINE_SPEC.md`](MATCHING_ENGINE_SPEC.md) |
 | Script mô phỏng thực nghiệm toán học (100–500 lệnh) | 10/12 | **Đã chạy được, đã có kết quả (A, B1, B2); thí nghiệm C (cân bằng, tốc độ mất hiệu quả theo m) đã chạy xong, kết quả sơ bộ** | `system_agents/matching_engine/simulation/` |
 | Phối hợp với Đức về hợp đồng đấu giá và EIP-712 | 05/12 | Đã đối chiếu spec hai bên, danh sách điểm lệch đã lập | `VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md` |
 

@@ -69,14 +69,14 @@ Spec hợp đồng của Đức [D] (`docs/SMART_CONTRACT_SPEC.md`, §3.2 và §
 | `nonce` | `Order.nonce` | Chống phát lại; xem §8.1 về `incrementNonce`. |
 | `deadline` | `Order.deadline` (epoch giây) | Thay trường `expiry` đề xuất trước đây. |
 | `signature` | `bidSignature` / `askSignature` của `MatchedTrade` | |
-| `status` | chỉ engine: `NEW \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
+| `status` | chỉ engine: `NEW \| PENDING_SETTLEMENT \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
 | `time_in_force` | chỉ engine: `GTC \| IOC` | **Không nằm trong struct được ký**; xem §6.1. |
-| `remaining_amount` | chỉ engine, **suy ra từ `filledAmount[orderId]` on-chain** | Hợp đồng là nguồn sự thật về khối lượng đã khớp [D, §3.3, bước 3]; engine đồng bộ đầu mỗi phiên, giữ `amount` gốc bất biến. |
+| `remaining_amount` | chỉ engine, **suy ra từ `amount − filledAmount[orderId]` on-chain − `in_flight`** (khối lượng đã gửi settlement mà chưa có `TradeSettled` hoặc revert) | Hợp đồng là nguồn sự thật về khối lượng đã khớp [D, §3.3, bước 3]; engine đồng bộ đầu mỗi phiên, giữ `amount` gốc bất biến. |
 | `first_session_id` / `sessions_alive` | chỉ engine | Ưu tiên theo tuổi (§5.2). |
 
 `MatchResult` bổ sung `session_id` và ánh xạ sang `MatchedTrade` của [D]: `{bidOrder, askOrder, bidSignature, askSignature, matchAmount, clearingPrice}`.
 
-**`trade_hash`:** `MatchedTrade` trong [D] **không có** trường `tradeHash`; sự kiện `TradeSettled` mang `tradeHash` do hợp đồng sinh, và chống phát lại dựa vào `filledAmount` theo từng lệnh cùng `nonce`. Vì vậy `trade_hash` ở phía engine chỉ là **khóa idempotency nội bộ** (tránh gửi hai lần cùng một khớp khi retry), không gửi on-chain. Công thức đề xuất: `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`; dùng `abi.encode` thay `encodePacked` để tránh va chạm giữa các giá trị độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên.
+**`trade_hash`:** `MatchedTrade` trong [D] **không có** trường `tradeHash`; sự kiện `TradeSettled` mang `tradeHash` (indexed) nhưng [D] **không nêu công thức** tính; chống phát lại dựa vào `filledAmount` theo từng lệnh, nên [D] không chặn gửi trùng cùng một `MatchedTrade` khi lệnh còn khối lượng, và từ `filledAmount` không phân biệt được "đúng khớp này đã settle" với "một khớp khác đã settle" (Đ15). Vì vậy `trade_hash` ở phía engine chỉ là **khóa idempotency nội bộ** (tránh gửi hai lần cùng một khớp khi retry), không gửi on-chain. Công thức đề xuất: `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`; dùng `abi.encode` thay `encodePacked` để tránh va chạm giữa các giá trị độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên.
 
 ### 3.3. Đơn vị, tick giá và giả định
 
@@ -92,27 +92,30 @@ Spec hợp đồng của Đức [D] (`docs/SMART_CONTRACT_SPEC.md`, §3.2 và §
 ```mermaid
 stateDiagram-v2
     [*] --> NEW: submit_order()
-    NEW --> PARTIALLY_FILLED: khớp một phần
-    NEW --> FILLED: khớp toàn bộ
-    PARTIALLY_FILLED --> FILLED: khớp hết phần còn lại
-    NEW --> ROLLED_OVER: hết phiên, GTC, chưa khớp
-    PARTIALLY_FILLED --> ROLLED_OVER: hết phiên, GTC, còn dư
-    ROLLED_OVER --> PARTIALLY_FILLED: khớp một phần ở phiên sau
-    ROLLED_OVER --> FILLED: khớp hết ở phiên sau
+    NEW --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    PARTIALLY_FILLED --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    ROLLED_OVER --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    PENDING_SETTLEMENT --> PARTIALLY_FILLED: TradeSettled, còn dư
+    PENDING_SETTLEMENT --> FILLED: TradeSettled, hết khối lượng
+    PENDING_SETTLEMENT --> ROLLED_OVER: settlement revert, GTC còn hạn (quay lại sổ)
+    PENDING_SETTLEMENT --> CANCELLED: settlement revert vì lệnh bị hủy hoặc vô hiệu on-chain
+    NEW --> ROLLED_OVER: hết phiên, GTC, chưa khớp, còn hạn
+    PARTIALLY_FILLED --> ROLLED_OVER: hết phiên, GTC, còn dư, còn hạn
+    ROLLED_OVER --> ROLLED_OVER: phiên sau vẫn chưa khớp, còn hạn và trong giới hạn rollover
     NEW --> CANCELLED: hết phiên, IOC, không khớp
     PARTIALLY_FILLED --> CANCELLED: hết phiên, IOC, còn dư
     NEW --> CANCELLED: người dùng hủy trước cutoff
     PARTIALLY_FILLED --> CANCELLED: người dùng hủy trước cutoff
-    ROLLED_OVER --> CANCELLED: người dùng hủy trước cutoff
-    NEW --> EXPIRED: quá expiry
-    PARTIALLY_FILLED --> EXPIRED: quá expiry
-    ROLLED_OVER --> EXPIRED: quá expiry hoặc vượt giới hạn rollover
+    ROLLED_OVER --> CANCELLED: người dùng hủy trước cutoff, hoặc cancelOrder/incrementNonce on-chain
+    NEW --> EXPIRED: quá deadline
+    PARTIALLY_FILLED --> EXPIRED: quá deadline
+    ROLLED_OVER --> EXPIRED: quá deadline hoặc vượt giới hạn rollover
     FILLED --> [*]
     CANCELLED --> [*]
     EXPIRED --> [*]
 ```
 
-`ROLLED_OVER` là trạng thái ổn định giữa hai phiên và được đưa vào snapshot của phiên sau như lệnh còn hiệu lực.
+`ROLLED_OVER` là trạng thái ổn định giữa hai phiên và được đưa vào snapshot của phiên sau như lệnh còn hiệu lực. `FILLED` và `PARTIALLY_FILLED` chỉ được đặt **sau khi có `TradeSettled` on-chain**, không phải ngay khi khớp off-chain; trong lúc chờ, lệnh ở `PENDING_SETTLEMENT` và khối lượng đã gửi được trừ khỏi `remaining_amount` (`in_flight`, §3.2), để phiên sau không phân bổ lại cùng khối lượng đó. Lệnh bị vô hiệu on-chain phát hiện qua event (`OrderCancelled`, `UserNonceIncremented`) hoặc khi settlement revert.
 
 ---
 
@@ -159,7 +162,7 @@ Bài Budish, Cramton & Shim (2015) [R3, mục VII.A] mô tả batch auction rờ
 
 | TIF | Hành vi khi hết phiên còn dư |
 |---|---|
-| **GTC** | `status = ROLLED_OVER`, giữ `price` và `order_id`, tăng `sessions_alive`; được ưu tiên theo tuổi ở phiên sau (§5.2). |
+| **GTC** | `status = ROLLED_OVER`, giữ `price` và `order_id`, tăng `sessions_alive`; được ưu tiên theo tuổi ở phiên sau (§5.2). Chỉ khi chưa vượt giới hạn rollover **và** `deadline ≥ next_cutoff + biên_an_toàn`; nếu không thì `EXPIRED`. |
 | **IOC** | Phần dư chuyển `CANCELLED` ngay khi phiên kết thúc. |
 
 ```mermaid
@@ -172,11 +175,11 @@ sequenceDiagram
     E->>OB: snapshot(NEW, PARTIALLY_FILLED, ROLLED_OVER; chưa hết hạn)
     E->>E: run_periodic_double_auction()
     loop mỗi lệnh còn dư
-        alt GTC và chưa vượt giới hạn rollover
+        alt GTC, chưa vượt giới hạn rollover và deadline ≥ next_cutoff + biên_an_toàn
             E->>OB: status=ROLLED_OVER, sessions_alive += 1
         else IOC
             E->>OB: status=CANCELLED
-        else GTC vượt giới hạn
+        else GTC vượt giới hạn rollover hoặc sắp quá deadline
             E->>OB: status=EXPIRED
         end
     end
@@ -185,12 +188,12 @@ sequenceDiagram
 
 ### 6.1. Ràng buộc từ hợp đồng
 
-- `time_in_force` **không nằm trong struct `Order` được ký** [D, §3.2], nên hợp đồng không bảo đảm engine tôn trọng GTC/IOC mà người dùng chọn. Giới hạn cứng duy nhất do người dùng ký là `deadline`: lệnh hết hạn thì `settleMatchedTrade` revert `SignatureExpired`. Hai hướng cần chốt với Đức: (a) thêm `timeInForce` vào `ORDER_TYPEHASH` để ràng buộc được ký; (b) giữ ngoài chuỗi và coi là tùy chọn không tin cậy của engine, khi đó rollover GTC chỉ là hành vi mặc định trong khoảng `deadline`.
+- `time_in_force` **không nằm trong struct `Order` được ký** [D, §3.2], nên hợp đồng không bảo đảm engine tôn trọng GTC/IOC mà người dùng chọn. Giới hạn **thời gian** duy nhất do người dùng ký là `deadline` (`amount` và `pricePerUnit` cũng được ký nhưng không liên quan tới phiên). [D, §3.4] khai báo lỗi `SignatureExpired`, nhưng quy trình xác minh ở [D, §3.3] chỉ liệt kê bốn bước (chữ ký, điều kiện giá, hạn mức còn lại của phía bid, cập nhật và chuyển tài sản) và **không liệt kê** kiểm `deadline`, `nonce`, hủy lệnh (`OrderAlreadyCancelledOrFilled` có trong interface), hai lệnh cùng `tokenId`, đúng vai trò BID/ASK, hay người mua khác người bán; cần Đức xác nhận hợp đồng có thực sự kiểm các điều này (Đ14). Hai hướng cần chốt về `time_in_force`: (a) thêm `timeInForce` vào `ORDER_TYPEHASH`: **không giúp hợp đồng thực thi IOC**, vì hợp đồng không có khái niệm phiên hay cutoff; IOC có thể thực thi bằng `deadline` ngắn (client đặt `deadline = cutoff + biên_an_toàn`) mà không đổi struct, và (a) chỉ có ý nghĩa nếu hợp đồng lưu thêm `sessionId`; (b) giữ ngoài chuỗi và coi là tùy chọn không tin cậy của engine, khi đó rollover GTC chỉ là hành vi mặc định trong khoảng `deadline`.
 - Lệnh bị hủy trên chuỗi (`cancelOrder`, event `OrderCancelled`) hoặc vô hiệu do `incrementNonce` (event `UserNonceIncremented`) phải bị loại khỏi snapshot; engine lắng nghe các event này. Hủy ngoài chuỗi qua API (§8.2) chỉ là yêu cầu tới engine: nếu engine ngoại tuyến hoặc không tuân thủ, chữ ký cũ vẫn còn hiệu lực đến `deadline`; muốn bảo đảm cứng người dùng phải gọi `cancelOrder` on-chain.
-- **Kiểm tra trạng thái ngay trước khi gửi:** engine có thể đã ngoại tuyến khi người dùng gọi `incrementNonce` hoặc `cancelOrder`, nên lệnh `ROLLED_OVER` nằm trong sổ có thể đã vô hiệu mà engine chưa biết. Trước mỗi lần gửi settlement, engine đọc lại nonce hiện tại, trạng thái hủy và `filledAmount` của cả hai lệnh; lệnh không hợp lệ bị loại và đề xuất khớp tính lại.
-- **Cuộc đua với `deadline`:** khớp ở cutoff không đảm bảo giao dịch on-chain nằm trong hạn; nếu block chứa giao dịch có timestamp sau `deadline` thì hợp đồng revert `SignatureExpired`. Engine loại lệnh có `deadline < cutoff + biên_an_toàn` (biên cần chốt, tối thiểu bằng thời gian xác nhận block ước tính cộng thời gian chờ batch).
+- **Kiểm tra trạng thái ngay trước khi gửi:** engine có thể đã ngoại tuyến khi người dùng gọi `incrementNonce` hoặc `cancelOrder`, nên lệnh `ROLLED_OVER` nằm trong sổ có thể đã vô hiệu mà engine chưa biết. Trước mỗi lần gửi settlement, engine đọc lại nonce hiện tại, trạng thái hủy và `filledAmount` của cả hai lệnh; lệnh không hợp lệ bị loại và **chỉ các cặp liên quan bị bỏ**, không tính lại toàn phiên. Đây là ngoại lệ có chủ đích của bất biến "cùng snapshot → cùng kết quả" (trạng thái on-chain không nằm trong snapshot). Không tính lại toàn phiên còn để tránh quyền chọn miễn phí: nếu người tham gia thấy giá khớp trước settlement rồi gọi `cancelOrder`/`incrementNonce` hoặc rút `approve` để ép engine tính lại hay làm revert, họ có thể thăm dò giá không tốn chi phí; vì vậy `match.executed` chỉ là thông tin chưa chắc chắn (§8.3).
+- **Cuộc đua với `deadline`:** khớp ở cutoff không đảm bảo giao dịch on-chain nằm trong hạn; nếu block chứa giao dịch có timestamp sau `deadline` thì hợp đồng revert `SignatureExpired` **với điều kiện [D] thực sự kiểm `deadline`** (Đ14); nếu không kiểm, lệnh hết hạn vẫn có thể bị settle. Engine loại lệnh có `deadline < cutoff + biên_an_toàn` (biên cần chốt, tối thiểu bằng thời gian xác nhận block ước tính cộng thời gian chờ batch).
 - **Phân bổ bằng 0:** pro-rata sau `floor` có thể cho `matchAmount = 0` với lệnh nhỏ; engine bỏ qua các lần khớp bằng 0, không gửi lên chuỗi (hợp đồng của Đức yêu cầu số lượng dương hay không là điểm cần xác nhận).
-- Khối lượng đã khớp lấy từ `filledAmount[orderId]` on-chain; nếu đệ trình khớp vượt phần còn lại, hợp đồng revert `OrderAmountExceeded`. Engine đồng bộ `remaining_amount` đầu phiên để không đề xuất khớp vô hiệu.
+- Khối lượng đã khớp lấy từ `filledAmount[orderId]` on-chain; `remaining = amount − filledAmount − in_flight`, với `in_flight` là các khớp đã gửi mà chưa có `TradeSettled` hoặc revert. Engine đồng bộ **trước** khi khớp phiên mới (§8.4). Nếu không trừ `in_flight`, settlement của phiên trước chưa được đào xong sẽ làm engine phân bổ lại cùng khối lượng đó: phía bid bị revert `OrderAmountExceeded`, nhưng phía ask **không được [D] chặn** (Đ2) nên lệnh bán có thể bị khớp vượt `amount` nếu người bán còn token và `approve`.
 
 Giới hạn: rollover không bảo đảm khớp ở phiên sau; cần `max_rollover_count` hoặc TTL để orderbook không phình vô hạn (**giá trị chưa chốt**, §11). Cơ chế carry-over giữa các phiên đã được mô tả cho batch auction ở [R3]; mô tả rollover theo mô hình sequential của bài về VCM [R1] **chưa được kiểm chứng** vì chưa đọc toàn văn.
 
@@ -236,7 +239,7 @@ Có **ba** quy tắc để so sánh. Ký hiệu cho thị trường nhiều lệ
 | Method | Path | Mô tả | Request (rút gọn) | Response |
 |---|---|---|---|---|
 | `POST` | `/v1/orders` | Đặt lệnh | `{order:{orderId, trader, orderType, tokenId, amount, pricePerUnit, nonce, deadline}, signature, time_in_force}` | `201 {orderId, status:"NEW"}` |
-| `DELETE` | `/v1/orders/{orderId}` | Yêu cầu engine bỏ lệnh khỏi các phiên sau (xem §6.1: không thay thế `cancelOrder` on-chain) | `{signature}` (chữ ký của `trader`) | `200 {orderId, status:"CANCELLED"}` |
+| `DELETE` | `/v1/orders/{order_id}` | Yêu cầu engine bỏ lệnh khỏi các phiên sau (xem §6.1: không thay thế `cancelOrder` on-chain) | `{signature}`: chữ ký EIP-712 của `trader` trên thông điệp `CancelRequest{orderId, cancel_nonce, deadline}` (định dạng và domain chưa chốt; không có `cancel_nonce` và hạn thì phát lại được) | `200 {orderId, status:"CANCEL_REQUESTED"}` (chữ ký cũ vẫn còn hiệu lực on-chain đến `deadline`) |
 | `GET` | `/v1/orders/{order_id}` | Trạng thái lệnh | — | `200 {…Order, status, remaining_amount}` |
 | `GET` | `/v1/orderbook/{token_id}` | Snapshot sổ lệnh | — | `200 {bids, asks}` |
 | `GET` | `/v1/sessions/{session_id}/matches` | Kết quả khớp của phiên | — | `200 {matches}` |
@@ -249,7 +252,7 @@ Mã lỗi tối thiểu: `400` (sai cấu trúc/giá trị), `401` (chữ ký sa
 | Kênh | Sự kiện | Payload |
 |---|---|---|
 | `orderbook.{token_id}` | `orderbook.update` | Delta top-of-book |
-| `session.{session_id}` | `match.executed` | `MatchResult` kèm `trade_hash`, trước khi gửi on-chain |
+| `session.{session_id}` | `match.executed` | `MatchResult` kèm `trade_hash`, trạng thái `pending` (chưa settlement, **chưa chắc chắn**: có thể bị loại hoặc revert; xem §6.1) |
 | `session.{session_id}` | `settlement.confirmed` | Khi nhận event `TradeSettled` [D, §3.4] |
 | `session.{session_id}` | `settlement.failed` | Khi giao dịch revert; retry có giới hạn, không lặp vô hạn |
 
@@ -261,8 +264,8 @@ sequenceDiagram
     participant SUB as Settlement Submitter
     participant SC as CarbonDoubleAuction.sol
 
+    E->>E: đồng bộ remaining = amount − filledAmount − in_flight, loại lệnh đã hủy hoặc vô hiệu
     E->>E: run_periodic_double_auction() ra MatchResult[]
-    E->>E: đồng bộ remaining_amount từ filledAmount, loại lệnh đã hủy
     E->>SUB: MatchedTrade[] (bidOrder, askOrder, 2 chữ ký, matchAmount, clearingPrice)
     SUB->>SC: batchSettleMatchedTrades(trades) hoặc settleMatchedTrade(trade)
     SC-->>SUB: TradeSettled hoặc revert (PriceMismatch, OrderAmountExceeded, ...)
@@ -271,10 +274,10 @@ sequenceDiagram
 
 **Trạng thái đối chiếu với spec hợp đồng của Đức [D] (đã đọc bản v2, commit `3194bad`, branch `docs/smart-contract-spec`, chưa merge vào `main`):**
 - *Thanh toán nguyên tử:* bản `CarbonDoubleAuction.sol` hiện trên `main` chỉ chuyển token carbon, không có bước trả tiền; [D, §3.1] thiết kế một giao dịch chuyển cả token thanh toán ERC-20 lẫn token carbon và hoàn tác toàn bộ nếu thiếu. Mô hình này phù hợp với DvP thông dụng [S2] (nguồn vendor/blog, không có nguồn riêng cho ERC-1155). **Mã trong `contracts/` chưa được cập nhật theo [D]**, nên đến lúc đó phần thiết kế mới là kế hoạch, không phải hành vi đã có.
-- *Xác minh chữ ký và giá on-chain:* [D, §3.3] kiểm chữ ký EIP-712, `ask ≤ clearingPrice ≤ bid`, `filledAmount + matchAmount ≤ amount`. Điều này **giảm** giả định tin cậy vào engine: engine không thể gửi cặp khớp không có chữ ký, vượt giá hay vượt khối lượng. Phần còn lại engine có thể làm sai mà hợp đồng không phát hiện: bỏ sót hoặc ưu tiên sai lệnh hợp lệ (vi phạm công bằng thứ tự, không vi phạm điều kiện on-chain), chọn `clearingPrice` thiên lệch trong khoảng [ask, bid], và trì hoãn phiên.
+- *Xác minh chữ ký và giá on-chain:* [D, §3.3] liệt kê bốn bước: khôi phục chữ ký (viết cho phía bid; phía ask ngầm hiểu), `ask ≤ clearingPrice ≤ bid`, `filledAmount[bidId] + matchAmount ≤ bidOrder.amount` (**chỉ phía bid**), rồi cập nhật và chuyển tài sản. Điều này **giảm** giả định tin cậy vào engine (không gửi được cặp khớp không có chữ ký hoặc ngoài khoảng giá), nhưng **chưa đủ**: [D] không liệt kê kiểm `filledAmount` phía ask, `deadline`, `nonce` hay hủy lệnh, hai lệnh cùng `tokenId`, đúng vai trò BID/ASK, người mua khác người bán (Đ2, Đ14). Cho đến khi Đức xác nhận, engine phải tự kiểm các điều này trước khi gửi (§6.1) và không coi hợp đồng là chốt chặn cuối. Phần còn lại engine có thể làm sai mà hợp đồng không phát hiện: bỏ sót hoặc ưu tiên sai lệnh hợp lệ (vi phạm công bằng thứ tự, không vi phạm điều kiện on-chain), chọn `clearingPrice` thiên lệch trong khoảng [ask, bid], và trì hoãn phiên.
 - *Vận hành engine:* người vận hành thấy toàn bộ luồng lệnh trước cutoff nên về nguyên tắc có thể giao dịch ngoài chuỗi trước (front-run off-chain) hoặc ưu tiên lệnh của mình; hợp đồng không phát hiện được. Cần ràng buộc vận hành (engine không tham gia thị trường, công bố băm snapshot lệnh trước cutoff để kiểm tra sau) — chưa có thiết kế cụ thể.
 - *Quyền gọi:* [D] cần quy định rõ ai được gọi `settleMatchedTrade` (code `main` dùng `onlyMatchingAgent`); quản lý khóa của Settlement Submitter thuộc thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
-- *MEV/front-running:* thứ tự giao dịch on-chain vẫn chịu rủi ro [R9]; chữ ký lệnh không loại bỏ rủi ro này.
+- *MEV/front-running:* [R9] mô tả front-running trên DEX; ở thiết kế này giá đã cố định trong lệnh ký và `clearingPrice` do engine chọn, nên rủi ro thực chủ yếu là sắp xếp lại thứ tự giữa settlement với `cancelOrder`/`incrementNonce`/thu hồi `approve`, và phụ thuộc ai được gọi hàm settle (Đ9). Khẳng định "validator không thể chèn lệnh trục lợi" trong [D, §4] chỉ đúng một phần và cần Đức xem lại.
 - *Batch:* `batchSettleMatchedTrades` bọc từng cặp trong kiểm tra độc lập để một lệnh lỗi không chặn cả phiên [D, §4]; engine cần giới hạn kích thước batch theo gas (ước tính của [D, §5]: 10 cặp ≈ 920.000 gas — số liệu của Đức, chưa được kiểm chứng độc lập).
 
 ---
@@ -377,7 +380,7 @@ Bất biến (theo mục 10.1 của đề cương nội bộ, tài liệu ngoài
 - Khối lượng mua khớp = khối lượng bán khớp; không lệnh nào khớp vượt `amount` gốc.
 - `ask ≤ clearing_price ≤ bid` cho mọi cặp (kể cả sau làm tròn tick, §3.3).
 - Lệnh `FILLED/CANCELLED/EXPIRED` không xuất hiện lại ở phiên sau.
-- Không cặp khớp nào được gửi hai lần: engine dùng khóa idempotency `trade_hash` (§3.2) và đối chiếu `filledAmount` on-chain trước khi gửi, để tránh tốn gas cho giao dịch revert [R12].
+- Không cặp khớp nào được gửi hai lần: engine dùng khóa idempotency `trade_hash` (§3.2) và đối chiếu `filledAmount` on-chain trước khi gửi, để tránh tốn gas cho giao dịch revert [R12]. **Giới hạn:** nếu [D] không chặn gửi trùng thì khóa idempotency chỉ bảo vệ phía engine (Đ15).
 - Mọi `clearingPrice` đưa lên chuỗi thỏa `ask ≤ clearingPrice ≤ bid` bằng số nguyên (nếu không, hợp đồng revert `PriceMismatch`).
 - Cùng snapshot → cùng kết quả.
 
@@ -388,7 +391,7 @@ Kịch bản test tối thiểu: phần lớn đã có trong `simulation/test_se
 ## 11. Giới hạn và câu hỏi mở
 
 1. Độ dài phiên (cutoff).
-2. Tie-break mặc định: `age_prorata` (phần dư theo largest remainder, §5.2) hay `fifo`; có code pro-rata ở GĐ2 không. Đề xuất: `age_prorata`.
+2. Tie-break mặc định: `age_prorata` (phần dư theo largest remainder, §5.2) hay `fifo`. Đề xuất: `age_prorata` (đã có cài đặt tham chiếu, §5.2).
 3. Giá theo cặp hay giá chung `kda` của phiên (§7). Đề xuất: `kda` (thí nghiệm C ở §9.5: `kda` không kém `pair` ở k = 0,5 và tốt hơn rõ ở k = 1).
 4. `max_rollover_count`/TTL cho lệnh GTC.
 5. Thiết kế thí nghiệm B: chiến lược khai giá nào (ZIP hay hàm shading theo k), kiểm tra hệ số Chatterjee–Samuelson với bài gốc, và chỉnh lại câu chữ nhiệm vụ trên Google Doc.
@@ -400,7 +403,9 @@ Kịch bản test tối thiểu: phần lớn đã có trong `simulation/test_se
 11. Điểm cần Đức xác nhận trong [D] (xem `docs/VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md`): kiểm `filledAmount` chỉ nêu cho phía bid ở [D, §3.3, bước 3] (cần cả phía ask); ai được gọi `cancelOrder`; `matchAmount = 0` có bị từ chối không.
 12. Quản lý khóa của Settlement Submitter, quyền gọi `settleMatchedTrade`, và phương án khi tác tử ngừng hoạt động.
 13. Chống thao túng phần dư pro-rata và ưu tiên theo tuổi (§5.2): largest remainder còn hai lỗ hổng đã biết (tách lệnh, nghịch lý Alabama); biện pháp khả thi trên chuỗi là khối lượng đặt lệnh tối thiểu và biên độ giá, còn khóa tài sản khi đặt lệnh cần đổi mô hình non-custodial (§8.1, [D]); chưa chốt phương án (largest remainder, chia theo ước số, hay phá hòa ngẫu nhiên có seed công bố).
-14. Phạm vi kết quả O(1/m²) của [RSW94] theo `k` và đối với giá theo từng cặp: chưa có nguồn gốc (§7); cần đọc toàn văn [RSW94] trước khi trích vào báo cáo chung.
+14. Hợp đồng [D] có kiểm `deadline`, `nonce`, hủy lệnh, hai lệnh cùng `tokenId`, vai trò BID/ASK, người mua khác người bán, và `filledAmount` phía ask không (§6.1, §8.4; Đ2, Đ14).
+15. Công thức `tradeHash` tất định để engine tính trước và hợp đồng chặn gửi trùng một khớp (§3.2; Đ15).
+16. Phạm vi kết quả O(1/m²) của [RSW94] theo `k` và đối với giá theo từng cặp: chưa có nguồn gốc (§7); cần đọc toàn văn [RSW94] trước khi trích vào báo cáo chung.
 
 ---
 
