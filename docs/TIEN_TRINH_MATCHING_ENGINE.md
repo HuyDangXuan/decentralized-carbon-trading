@@ -2,6 +2,17 @@
 
 Cập nhật: 10/11/2026 (Giai đoạn 2, tuần 2). Branch: `auction-algorithm-engineer` (đặt theo vai trò Auction Algorithm Engineer trong bảng phân công Giai đoạn 2). Danh sách việc cần trao đổi với từng bên nằm ở [`VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md`](VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md).
 
+## 0. Tóm tắt trạng thái (10/11/2026)
+
+| Mốc | Tình trạng | Còn thiếu |
+|---|---|---|
+| **25/11, Spec Matching Engine và API** | **Hoàn thành về nội dung** (12 mục; đã review chéo bằng Opus 4.6, Opus 5.5 và hai vòng Argon; đã đối chiếu spec hợp đồng của Đức). Đang ở chế độ "bản thiết kế chờ nhóm chốt". | Nhóm chốt các quyết định mở (§11 của spec; danh sách ở file trao đổi); push spec lên branch để Huy xem. |
+| **10/12, Script mô phỏng 100–500 lệnh** | Có kết quả A, B1, B2 và thí nghiệm C (cân bằng, 24 cấu hình, m = 2…16) ở mức **sơ bộ**; engine tham chiếu số nguyên có test. | Báo cáo kết quả cuối; nhiều đơn vị mỗi lệnh và m > 16 nếu muốn; đọc toàn văn hai bài gốc còn lại. |
+| **05/12, Phối hợp với Đức (hợp đồng, EIP-712)** | Đã đối chiếu hai spec và lập danh sách 13 điểm (Đ1–Đ13). | **Cần trao đổi trực tiếp với Đức**; chưa có phản hồi. |
+| Tuần 5–8, test case và threat modeling | Phần lớn kịch bản test §10 đã có trong `test_session_engine.py`. | Test lớp API, đồng bộ `filledAmount` on-chain, threat modeling. |
+
+Mã và tài liệu nằm trên branch `auction-algorithm-engineer`; một số commit mới **chưa được push** (chỉ push khi người phụ trách bảo, và chỉ lên branch này, không lên `main`).
+
 ## 1. Đã làm được
 
 | Hạng mục theo bảng Giai đoạn 2 | Hạn | Tình trạng | Sản phẩm |
@@ -28,8 +39,8 @@ Cập nhật: 10/11/2026 (Giai đoạn 2, tuần 2). Branch: `auction-algorithm-
 | `kda_sim.py` | Thị trường vector hóa m mua + m bán một đơn vị, ba quy tắc giá (`pair`, `marginal`, `kda`), tiện ích kỳ vọng của người lệch (common random numbers) |
 | `equilibrium_search.py` | Phản ứng tối ưu từng điểm (`U = v·W(b) − P(b)`), `find_equilibrium` (phi tham số hoặc tuyến tính), `epsilon` (`eps_opt` chệch lên, `eps_xval` kiểm chéo) |
 | `run_experiment_c.py` | Thí nghiệm C: mất hiệu quả ở cân bằng xấp xỉ theo m, ba quy tắc giá, ghi từng dòng, chạy tiếp được |
-| `session_engine.py` | Engine tham chiếu thuần số nguyên cho spec §5–§7: `match_session` (giá → tuổi → pro-rata Hamilton; `pair`/`marginal`/`kda`; làm tròn `floor`/`ceil`/`half_up`/`half_even`) |
-| `test_*.py` | toàn bộ suite pass ở lần chạy gần nhất (xem lệnh bên dưới) |
+| `session_engine.py` | Engine tham chiếu thuần số nguyên cho spec §5–§7: `match_session` (giá → tuổi → pro-rata Hamilton; `pair`/`marginal`/`kda`; làm tròn `floor`/`ceil`/`half_up`/`half_even`) và `end_session` (rollover GTC/IOC, hết hạn theo `max_rollover`) |
+| `test_*.py` | 74 test pass (chạy lần cuối 10/11/2026) |
 | `results/` | CSV và đồ thị của A, B2 và C |
 
 Chạy lại: `python -m unittest discover -s system_agents/matching_engine/simulation`, `python .../run_experiment.py a`, `python .../run_experiment_b.py b1`, `python .../run_experiment_b.py b2`, `python .../verify_closed_forms.py`.
