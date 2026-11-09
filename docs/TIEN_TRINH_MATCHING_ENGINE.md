@@ -1,6 +1,6 @@
 # Tiến trình phần Matching Engine & mô phỏng (Nguyễn Bảo Phi)
 
-Cập nhật: 08/11/2026 (Giai đoạn 2, tuần 2). Branch: `Phi` (8 commit so với `main`, chưa push). Danh sách việc cần trao đổi với từng bên nằm ở [`PHI_CAN_TRAO_DOI.md`](PHI_CAN_TRAO_DOI.md).
+Cập nhật: 08/11/2026 (Giai đoạn 2, tuần 2). Branch: `auction-algorithm-engineer` (đặt theo vai trò Auction Algorithm Engineer trong bảng phân công Giai đoạn 2). Danh sách việc cần trao đổi với từng bên nằm ở [`VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md`](VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md).
 
 ## 1. Đã làm được
 
@@ -8,7 +8,7 @@ Cập nhật: 08/11/2026 (Giai đoạn 2, tuần 2). Branch: `Phi` (8 commit so 
 |---|---|---|---|
 | Thiết kế logic Matching Engine và đặc tả API Service | 25/11 | **Bản đầy đủ, chờ nhóm chốt các quyết định mở** | [`MATCHING_ENGINE_SPEC.md`](MATCHING_ENGINE_SPEC.md) |
 | Script mô phỏng thực nghiệm toán học (100–500 lệnh) | 10/12 | **Đã chạy được, đã có kết quả** | `system_agents/matching_engine/simulation/` |
-| Phối hợp với Đức về hợp đồng đấu giá và EIP-712 | 05/12 | Đã đối chiếu spec hai bên, danh sách điểm lệch đã lập | `PHI_CAN_TRAO_DOI.md` |
+| Phối hợp với Đức về hợp đồng đấu giá và EIP-712 | 05/12 | Đã đối chiếu spec hai bên, danh sách điểm lệch đã lập | `VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md` |
 
 ### 1.1. Spec Matching Engine
 - Mô hình dữ liệu ánh xạ sang struct `Order` được ký EIP-712 trong spec hợp đồng của Đức (`docs/SMART_CONTRACT_SPEC.md`, branch `docs/smart-contract-spec`, commit `3194bad`).
@@ -45,7 +45,7 @@ Chạy lại: `python -m unittest discover -s system_agents/matching_engine/simu
 
 ## 2. Còn vấn đề cần giải quyết
 
-### 2.1. Phụ thuộc người khác (chi tiết ở `PHI_CAN_TRAO_DOI.md`)
+### 2.1. Phụ thuộc người khác (chi tiết ở `VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md`)
 - **Đức:** đơn vị `amount` (kg hay tCO2e, chênh 1000 lần); đơn vị `pricePerUnit`; hướng làm tròn giá khớp; kiểm `filledAmount` mới nêu cho phía bid; quyền gọi `cancelOrder`; `time_in_force` có nằm trong struct được ký không; code `contracts/` trên `main` chưa theo spec mới.
 - **Huy:** sửa câu chữ nhiệm vụ 3 trên Google Doc (với khai trung thực, welfare không đổi theo k); chốt độ dài phiên, tie-break mặc định, giá theo cặp hay giá chung, giới hạn rollover; SRS/UML cần phản ánh vòng đời lệnh và rollover.
 - **Thắng:** tiêu chí "lớp tín chỉ" được khớp với nhau; đối chiếu wireframe Trading Floor với API.
@@ -71,4 +71,4 @@ Chạy lại: `python -m unittest discover -s system_agents/matching_engine/simu
 
 ### 2.5. Quy trình
 - Commit `7285ba3` (spec bản đầu) đã nằm trên `main` ở remote do lần push đầu chưa dùng branch; trưởng nhóm đã được báo.
-- Các commit tiếp theo nằm trên branch `Phi`, chưa push; push theo branch khi được yêu cầu.
+- Các commit tiếp theo nằm trên branch `auction-algorithm-engineer`; chỉ push lên branch này, không push lên `main`.
