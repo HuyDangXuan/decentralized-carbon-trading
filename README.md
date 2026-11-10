@@ -16,6 +16,17 @@ Dự án kết hợp giữa **Công nghệ Blockchain (ERC-1155, Smart Contracts
 
 ---
 
+## 📅 Nhật ký Tiến độ & Quyết định Kỹ thuật Hàng ngày (Daily Progress Logs)
+
+> **Kênh thông tin duy nhất (Single Source of Truth - SSOT):** Mọi thay đổi kỹ thuật, tài liệu đặc tả, quyết định kiến trúc và phân công nhiệm vụ dù là nhỏ nhất đều được Chủ nhiệm đề tài (**Đặng Xuân Huy**) cập nhật liên tục trực tiếp lên nhánh `main`.
+
+- 📂 **Thư mục theo dõi tiến độ tổng thể:** [`docs/progress/`](docs/progress/README.md)
+- 📝 **Nhật ký mới nhất [10/11/2026]:** [`docs/progress/2026-11-10/`](docs/progress/2026-11-10/README.md) *(Khóa 4 thông số kiến trúc ADR-001, ban hành SRS IEEE 830, cập nhật kiến trúc v2.0 và hiệu chỉnh đề cương học thuật)*.
+- 📋 **Hồ sơ Đặc tả SRS (IEEE 830):** [`docs/SRS_DOCUMENT.md`](docs/SRS_DOCUMENT.md)
+- ⚖️ **Quyết định Kiến trúc (ADR-001):** [`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md)
+
+---
+
 ## 🏛️ 1. Hướng 1: Các Sub-Agent trong Kiến trúc Hệ thống (System Architecture)
 
 Thư mục `system_agents/` chứa các tác tử phần mềm tự hành phục vụ vận hành thị trường:
@@ -61,7 +72,12 @@ Blockchain/
 │   ├── oracle_agent/           # Tác tử giám sát giá & cảnh báo
 │   └── retirement_agent/       # Tác tử bù đắp & hủy tín chỉ
 ├── docs/                       # Tài liệu thiết kế & Báo cáo NCKH
-│   ├── SYSTEM_ARCHITECTURE.md  # Sơ đồ kiến trúc & luồng xử lý
+│   ├── progress/               # Nhật ký tiến độ & quyết định kỹ thuật hàng ngày (SSOT)
+│   │   ├── README.md           # Dashboard tổng thể & Template nhật ký
+│   │   └── 2026-11-10/         # Nhật ký chi tiết ngày 10/11/2026
+│   ├── SRS_DOCUMENT.md         # Đặc tả yêu cầu phần mềm IEEE 830-1998 & UML
+│   ├── ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md # Quyết định kiến trúc ADR-001
+│   ├── SYSTEM_ARCHITECTURE.md  # Sơ đồ kiến trúc & luồng xử lý v2.0
 │   └── PHASE1_ROADMAP.md       # Chi tiết phân công công việc Giai đoạn 1
 ├── scripts/                    # Scripts deploy & benchmark
 ├── tests/                      # Kiểm thử hợp đồng & giải thuật
