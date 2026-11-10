@@ -27,6 +27,7 @@ graph TD
         AI4["scientific-research-writer<br/>(Hỗ trợ Huy)"]
         AI5["benchmark-evaluation-specialist<br/>(Cả nhóm)"]
         AI6["git-commit-agent<br/>(Cả nhóm)"]
+        AI7["lead-architect-progress-logger<br/>(Độc quyền cho Huy)"]
     end
 
     subgraph System_Level ["CẤP ĐỘ 1: SOFTWARE AGENTS (Hệ thống phần mềm sàn)"]
@@ -154,6 +155,7 @@ Các AI Sub-Agent này là những chuyên gia ảo được tinh chỉnh chuyê
 | **`scientific-research-writer`** | **Đặng Xuân Huy** | Chuyên sâu về **Viết báo cáo NCKH & Học thuật**. Soạn thảo tài liệu đặc tả SRS chuẩn IEEE 830, viết báo cáo nghiên cứu cấu trúc IMRaD, chuẩn hóa trích dẫn BibTeX và hỗ trợ bài báo hội nghị. |
 | **`benchmark-evaluation-specialist`** | **Cả nhóm** | Chuyên sâu về **Kiểm thử tải & Thực nghiệm**. Viết script đo lường chi phí Gas thực tế, thông lượng TPS, thời gian khớp lệnh và trực quan hóa số liệu thành biểu đồ khoa học (Matplotlib/Seaborn). |
 | **`git-commit-agent`** | **Cả nhóm** | Chuyên gia **DevOps & Quản trị mã nguồn**. Tự động rà soát file thay đổi, soạn commit message chuẩn quốc tế **Conventional Commits** (`feat:`, `fix:`, `docs:`) và đồng bộ lên GitHub an toàn. |
+| **`lead-architect-progress-logger`** | **Đặng Xuân Huy** | Trợ lý tự động hóa **Nhật ký Tiến độ & Quản trị Kiến trúc** độc quyền cho Chủ nhiệm đề tài. Tự động quét Git diff, phát hiện mọi thay đổi từ nhỏ nhất, cập nhật `docs/progress/YYYY-MM-DD/`, cập nhật dashboard và push lên nhánh `main`. |
 
 ---
 
@@ -189,6 +191,11 @@ Khi bạn hoặc thành viên trong nhóm cần thực hiện một công việc
 #### 📌 Mẫu 6: Dành cho cả nhóm khi đẩy mã nguồn lên Git
 ```text
 "Nhờ agent `git-commit-agent` kiểm tra các file vừa thay đổi trong dự án và thực hiện commit, push lên GitHub giúp tôi."
+```
+
+#### 📌 Mẫu 7: Dành riêng cho Chủ nhiệm Đặng Xuân Huy (Tự động hóa ghi nhật ký & push lên main)
+```text
+"Hãy gọi agent `lead-architect-progress-logger` để quét toàn bộ thay đổi hôm nay, lập nhật ký vào docs/progress/ và push trực tiếp lên main giúp tôi."
 ```
 
 ---
