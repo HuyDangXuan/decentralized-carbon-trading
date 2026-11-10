@@ -4,7 +4,26 @@
 **Giai đoạn:** Giai đoạn 2 — Phân tích Yêu cầu và Thiết kế Chi tiết Hệ thống (11/2026 – 01/2027)
 **Người phụ trách:** Nguyễn Bảo Phi (Auction Algorithm Engineer)
 **Phối hợp:** Đặng Xuân Huy (SRS/UML), Nguyễn Hoàng Đức (CarbonDoubleAuction.sol/EIP-712)
-**Trạng thái:** Bản thiết kế (design spec), cập nhật 10/11/2026 — chưa triển khai đầy đủ. Đã có bộ mô phỏng và kết quả thực nghiệm sơ bộ trong `system_agents/matching_engine/simulation/` (mục 9.5, kèm giới hạn cách đọc); phần còn lại là đề xuất cần nhóm/GVHD chốt trước khi code hóa ở Giai đoạn 3.
+**Trạng thái:** Bản thiết kế (design spec), cập nhật 10/11/2026 — đã cài bản mock theo ADR-001 (xem mục "Cập nhật theo ADR-001" bên dưới), chưa nối blockchain. Đã có bộ mô phỏng và kết quả thực nghiệm sơ bộ trong `system_agents/matching_engine/simulation/` (mục 9.5, kèm giới hạn cách đọc); phần còn lại là đề xuất cần nhóm/GVHD chốt trước khi code hóa ở Giai đoạn 3.
+
+---
+
+## Cập nhật theo ADR-001 (10/11/2026)
+
+`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md` (Chủ nhiệm ban hành) khóa 4 thông số kiến trúc và README quy định đơn vị dữ liệu. Code `system_agents/matching_engine/auction_agent.py` (lớp bọc `session_engine.py`) và `api_service.py` đã làm theo. Bảng dưới ghi cách ADR chồng lên các mục còn lại của spec; **khi hai bên khác nhau, ADR là bản đang áp dụng** và phần khác biệt được liệt kê để nhóm xem lại.
+
+| Thông số | ADR-001 | Trong code | Khác với phần còn lại của spec |
+|---|---|---|---|
+| Chu kỳ phiên | 5 phút (gom lệnh 4 phút 30 giây, khớp 15 giây, settlement 15 giây) hoặc 15 phút | Chưa có đồng hồ; `POST /api/v1/sessions/run` kích hoạt phiên | Mốc 15 giây cho settlement chưa kiểm bằng đo gas/thời gian thực (Đ12 chưa benchmark) |
+| Phá hòa | `age_prorata` + Hamilton; phần dư bằng nhau thì FIFO | Đã cài; `seq` do engine gán khi nhận lệnh | §5.2 từng ghi "remaining lớn hơn, rồi `order_id`": đã đổi sang FIFO (tốt hơn vì `order_id` do người dùng tạo). Tách lệnh và nghịch lý Alabama (§5.2) vẫn còn |
+| Quy tắc giá | `P* = floor((b_M + s_M)/2)`, k = 1/2, gọi là "kda" | Quy tắc `marginal` của engine (hằng `PRICING_RULE`) | **Công thức ADR là `marginal` của §7, không phải `kda` của §7.** Khác nhau khi có lệnh kế tiếp chưa khớp: BID 10, ASK 1, ASK 2 (mỗi lệnh 1 đơn vị, k = 1/2) cho 5,5 theo ADR nhưng 1,5 theo `kda`, và ASK 2 vẫn bán được ở 5,5 mà không được khớp. Thí nghiệm C (sơ bộ) ở k = 0,5 không cho thấy `pair` chậm hơn (độ dốc ≈ −2,1 cho cả hai), nên lý do "`pair` chỉ O(1/m)" trong ADR chỉ đúng ở k = 1 |
+| Rollover | `MAX_ROLLOVER_SESSIONS = 3`; `rollover_count ≥ 3` thì `EXPIRED`; IOC dư thì `CANCELLED` | `end_session(max_rollover=2)`: lệnh GTC sống tối đa 3 phiên | §6 ghi "sống `max_rollover + 1` phiên": với ADR phải dùng `max_rollover = 2` |
+| Đơn vị | `amount` nguyên tCO2e; giá micro-USDC mỗi tCO2e (tick = 1) | Số thực bị từ chối; giá nguyên | Giải quyết Đ1 và Đ3 ở phía nhóm; làm tròn `floor` (Đ4) nằm trong [ask, bid] |
+
+Khác biệt khác so với các mục sau:
+- **API:** §8.2 dùng đường dẫn `/v1/...`; SRS FR-15 dùng `/api/v1/...` và bản mock theo SRS. Hủy lệnh trả `CANCELLED` (SRS FR-10) thay vì `CANCEL_REQUESTED`, kèm `onchain_valid_until` vì chữ ký gốc vẫn dùng được on-chain đến hạn. Định dạng chữ ký `CancelRequest` vẫn chưa được chốt với Đức.
+- **Vòng đời:** bản mock chưa có `PENDING_SETTLEMENT` (§4, §6.1): coi như settlement luôn thành công ngay sau khi khớp. Khớp giữa hai lệnh cùng `trader` bị bỏ để hợp đồng không revert (`SelfTradingNotAllowed`); biện pháp này không chống được hai ví của cùng một người.
+- **Hạn:** README và nhật ký 10/11 ghi 25/11; ADR ghi 20/11.
 
 ---
 
@@ -148,7 +167,7 @@ Bài Budish, Cramton & Shim (2015) [R3, mục VII.A] mô tả batch auction rờ
 
 **Mức độ chứng cứ:** ngoài [R3], một đề xuất cộng đồng cho batch auction đa tài sản cũng nêu quy tắc tương tự (ưu tiên lệnh từ batch cũ hơn, pro-rata chỉ ở batch phải chia phần) [S3]. Đó là đề xuất, không phải tiêu chuẩn. Chưa tìm được tài liệu công khai nào mô tả quy tắc chia phần ở giá hòa của CoW Protocol, nên spec không dựa vào CoW cho điểm này.
 
-**Trạng thái triển khai:** đã có engine tham chiếu số nguyên `system_agents/matching_engine/simulation/session_engine.py` (`match_session`, `end_session`): ưu tiên giá → tuổi → pro-rata Hamilton (hoặc FIFO), ba quy tắc giá, bốn cách làm tròn, rollover GTC/IOC; có test và đã đối chiếu với baseline về khối lượng khớp và welfare. **Chưa tích hợp** vào `auction_agent.py`; API Service và so sánh `fifo` với `age_prorata` bằng mô phỏng thuộc Giai đoạn 3.
+**Trạng thái triển khai:** đã có engine tham chiếu số nguyên `system_agents/matching_engine/session_engine.py` (`match_session`, `end_session`): ưu tiên giá → tuổi → pro-rata Hamilton (hoặc FIFO), ba quy tắc giá, bốn cách làm tròn, rollover GTC/IOC; có test và đã đối chiếu với baseline về khối lượng khớp và welfare. **Chưa tích hợp** vào `auction_agent.py`; API Service và so sánh `fifo` với `age_prorata` bằng mô phỏng thuộc Giai đoạn 3.
 
 ### 5.3. Bất biến cần kiểm tra
 
@@ -384,7 +403,7 @@ Bất biến (theo mục 10.1 của đề cương nội bộ, tài liệu ngoài
 - Mọi `clearingPrice` đưa lên chuỗi thỏa `ask ≤ clearingPrice ≤ bid` bằng số nguyên (nếu không, hợp đồng revert `PriceMismatch`).
 - Cùng snapshot → cùng kết quả.
 
-Kịch bản test tối thiểu: phần lớn đã có trong `simulation/test_session_engine.py` (sổ trống, một phía trống, bid < ask toàn bộ, bid = ask, pro-rata và phần dư, khác tuổi cùng giá, partial fill, trùng `order_id`, rollover nhiều phiên, IOC, hết hạn theo `max_rollover`). **Chưa viết:** hủy sát cutoff, đồng bộ `filledAmount` on-chain, giá nhiều chữ số thập phân ở lớp API.
+Kịch bản test tối thiểu: phần lớn đã có trong `system_agents/matching_engine/test_session_engine.py` (sổ trống, một phía trống, bid < ask toàn bộ, bid = ask, pro-rata và phần dư, khác tuổi cùng giá, partial fill, trùng `order_id`, rollover nhiều phiên, IOC, hết hạn theo `max_rollover`). **Chưa viết:** hủy sát cutoff, đồng bộ `filledAmount` on-chain, giá nhiều chữ số thập phân ở lớp API.
 
 ---
 

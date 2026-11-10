@@ -6,10 +6,11 @@ Cập nhật: 10/11/2026 (Giai đoạn 2, tuần 2). Branch: `auction-algorithm-
 
 | Mốc | Tình trạng | Còn thiếu |
 |---|---|---|
+| **ADR-001 (Chủ nhiệm ban hành 10/11): tích hợp engine và API** (README và nhật ký ghi hạn 25/11; ADR ghi 20/11, cần hỏi Huy) | `auction_agent.py` mới (lớp bọc `session_engine.py`) và `api_service.py` (FastAPI) đã có kèm test; baseline float cũ giữ ở `simulation/baseline_agent.py` để đối chứng; đã sửa `market_maker_agent.py` cho đơn vị micro-USDC. Suite: 47 test ở `matching_engine/` (15 test API cần cài `requirements.txt`) và 57 test ở `simulation/`, đều qua. | Chưa nối blockchain/settlement thật, chưa có đồng hồ phiên 5/15 phút; các điểm lệch giữa ADR và kết quả đã kiểm (công thức giá, rollover) ở đầu `MATCHING_ENGINE_SPEC.md` và H7–H9 của file trao đổi. |
 | **25/11, Spec Matching Engine và API** | **Hoàn thành về nội dung** (12 mục; đã review chéo bằng Opus 4.6, Opus 5.5 và hai vòng Argon; đã đối chiếu spec hợp đồng của Đức). Đang ở chế độ "bản thiết kế chờ nhóm chốt". | Nhóm chốt các quyết định mở (§11 của spec; danh sách ở file trao đổi); push spec lên branch để Huy xem. |
 | **10/12, Script mô phỏng 100–500 lệnh** | Có kết quả A, B1, B2 và thí nghiệm C (cân bằng, 24 cấu hình, m = 2…16) ở mức **sơ bộ**; engine tham chiếu số nguyên có test. | Báo cáo kết quả cuối; nhiều đơn vị mỗi lệnh và m > 16 nếu muốn; đọc toàn văn hai bài gốc còn lại. |
 | **05/12, Phối hợp với Đức (hợp đồng, EIP-712)** | Đã đối chiếu hai spec và lập danh sách 15 điểm (Đ1–Đ15). | **Cần trao đổi trực tiếp với Đức**; chưa có phản hồi. |
-| Tuần 5–8, test case và threat modeling | Phần lớn kịch bản test §10 đã có trong `test_session_engine.py`. | Test lớp API, đồng bộ `filledAmount` on-chain, threat modeling. |
+| Tuần 5–8, test case và threat modeling | Phần lớn kịch bản test §10 đã có trong `matching_engine/test_session_engine.py`, `test_auction_agent.py`, `test_api_service.py`. | Test lớp API, đồng bộ `filledAmount` on-chain, threat modeling. |
 
 Mã và tài liệu nằm trên branch `auction-algorithm-engineer`; một số commit mới **chưa được push** (chỉ push khi người phụ trách bảo, và chỉ lên branch này, không lên `main`).
 
@@ -66,6 +67,22 @@ Chạy lại: `python -m unittest discover -s system_agents/matching_engine/simu
 | Seed dùng `hash()` không tái lập (ngẫu nhiên theo tiến trình) | Reviewer Opus 5.5 | Dùng `zlib.crc32` |
 | Chế độ tuyến tính khớp cả nút không giao dịch; `eps_xval` bị cắt về 0 nên chệch lên | Người phụ trách nghiệm thu J3 | Chỉ khớp trên nút có xác suất thắng dương; bỏ phép cắt |
 | Bộ test của engine không bắt được hai đột biến (phá hòa Hamilton theo khối lượng, thứ tự tuổi khi ghép cặp) | Kiểm đột biến mã của người phụ trách | Bổ sung hai test hồi quy |
+
+### 1.5. Tích hợp ADR-001 (10/11/2026, theo quy trình mới trong README)
+
+Đã merge `origin/main` vào branch trước khi làm (không xung đột), rồi:
+
+| Thay đổi | Ghi chú |
+|---|---|
+| `session_engine.py` và `test_session_engine.py` chuyển từ `simulation/` lên `matching_engine/` | Lõi dùng cho hệ thống chính, không còn nằm trong thư mục mô phỏng |
+| Phá hòa Hamilton khi phần dư bằng nhau: FIFO theo `seq` thay vì "remaining lớn hơn rồi `order_id`" | Theo ADR-001 / FR-08; test hồi quy (a) viết lại |
+| `auction_agent.py` viết lại: `DoubleAuctionAgent` dùng `session_engine`, vòng đời `NEW`/`ROLLED_OVER`/`FILLED`/`EXPIRED`/`CANCELLED`, `rollover_count`, từ chối giá/khối lượng không nguyên, bỏ khớp cùng `trader`, không sửa lệnh đầu vào | Giá `floor((b_M + s_M)/2)` = quy tắc `marginal` của engine (hằng `PRICING_RULE`); rollover tối đa 3 phiên = `max_rollover=2` |
+| `api_service.py` (FastAPI): `POST/DELETE/GET /api/v1/orders`, `GET /api/v1/orderbook/{tokenId}`, `POST /api/v1/sessions/run`, `GET /api/v1/sessions/...`, `WS /ws/orderbook/{tokenId}`; xác minh chữ ký EIP-712 `Order` và `CancelRequest` bằng `eth-account` | Bản mock, sổ lệnh trong bộ nhớ; giới hạn ghi ở đầu file |
+| `simulation/baseline_agent.py` (agent float cũ, đổi tên `BaselineAuctionAgent`) | Chỉ làm đối chứng cho thực nghiệm A/B và test welfare |
+| `test_auction_agent.py` (15 test), `test_api_service.py` (15 test) | Kiểm đột biến: tắt xác minh chữ ký làm 4 test API fail; bỏ chặn phát lại `cancel_nonce` làm 1 test fail; lệch một phiên rollover và đổi `PRICING_RULE` sang `kda` đều làm test fail |
+| `requirements.txt` (README đã nhắc nhưng chưa có) | fastapi, uvicorn, eth-account, httpx; phiên bản đã kiểm trong venv riêng |
+
+**Chưa làm hoặc chưa kiểm:** settlement/`PENDING_SETTLEMENT`, nonce và hủy on-chain, kiểm dải giá Oracle (mã 422), đồng hồ phiên, chạy `uvicorn` thật với trình duyệt/DApp (mới kiểm bằng `TestClient`), `time_in_force` vẫn ngoài chữ ký (Đ5).
 
 ## 2. Còn vấn đề cần giải quyết
 
