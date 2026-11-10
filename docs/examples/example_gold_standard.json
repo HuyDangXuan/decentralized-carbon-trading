@@ -1,0 +1,62 @@
+{
+  "name": "Carbon Credit - Chương trình Bếp Sạch Cộng đồng Mekong (2026)",
+  "description": "Verified Carbon Credit under standard Gold Standard VER",
+  "image": "ipfs://bafybeigoldstandardprojectimage",
+  "decimals": 0,
+  "unit": "tCO2e",
+  "price_unit": "USDC",
+  "price_decimals": 6,
+  "properties": {
+    "project_id": "GS-9012",
+    "standard": "Gold Standard VER",
+    "methodology": "GS-TPDDTEC - Technologies and Practices to Displace Decentralized Thermal Energy Consumption",
+    "project_type": "COOKSTOVE",
+    "vintage_year": 2026,
+    "vintage_period": {
+      "start_date": "2026-01-01",
+      "end_date": "2026-06-30"
+    },
+    "total_issued_tCO2e": 12000,
+    "country": "VN",
+    "region": "Đồng bằng Sông Cửu Long",
+    "developer": "0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7",
+    "developer_name": "Tổ chức Bếp Sạch Mekong",
+    "verifier": "SCS Global Services",
+    "verification_body_id": "VVB-0042",
+    "verified_at": 1794268800,
+    "status": "VERIFIED_ACTIVE",
+    "sdg_contributions": [
+      {
+        "sdg_number": 3,
+        "sdg_name": "Good Health and Well-being",
+        "contribution_description": "Giảm ô nhiễm không khí trong nhà"
+      },
+      {
+        "sdg_number": 5,
+        "sdg_name": "Gender Equality",
+        "contribution_description": "Giảm thời gian nấu nướng cho phụ nữ"
+      },
+      {
+        "sdg_number": 7,
+        "sdg_name": "Affordable and Clean Energy",
+        "contribution_description": "Bếp cải tiến tiết kiệm 60% nhiên liệu"
+      },
+      {
+        "sdg_number": 13,
+        "sdg_name": "Climate Action",
+        "contribution_description": "Giảm 12000 tCO2e/năm"
+      }
+    ],
+    "additionality": "PROVEN",
+    "corresponding_adjustment": true,
+    "asset_class": "cookstove",
+    "vintage_window": {
+      "start_year": 2026,
+      "end_year": 2026
+    },
+    "standard_category": "Gold_Standard",
+    "is_fungible_pool": true,
+    "fungibility_group_id": "cookstove_2026-2026_Gold_Standard",
+    "permanence_risk_buffer": 15
+  }
+}

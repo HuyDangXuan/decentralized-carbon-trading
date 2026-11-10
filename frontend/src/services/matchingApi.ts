@@ -1,367 +1,199 @@
-/**
- * services/matchingApi.ts
- * Module kết nối REST API + WebSocket của Matching Engine (Phi).
- *
- * Giải quyết vấn đề T2:
- *   - Chuyển luồng đặt lệnh: Frontend → API Service (off-chain) thay vì gọi on-chain
- *   - Tương thích với đặc tả API §8 trong MATCHING_ENGINE_SPEC.md
- *   - Hỗ trợ WebSocket real-time cho Depth Chart & Trade notifications
- *
- * Endpoints (theo spec Phi §8.2):
- *   POST   /api/v1/orders              – Gửi lệnh đã ký EIP-712
- *   DELETE  /api/v1/orders/{orderId}    – Hủy lệnh off-chain
- *   GET     /api/v1/orderbook/{tokenId} – Lấy sổ lệnh hiện tại
- *   POST    /api/v1/sessions/run        – Kích hoạt khớp lệnh (admin)
- *   GET     /api/v1/sessions/latest     – Kết quả phiên gần nhất
- *
- * WebSocket (theo spec Phi §8.3):
- *   WS /ws/orderbook/{tokenId}          – Stream sổ lệnh real-time
- */
+import type { SignedOrder } from "../lib/orders";
 
-import type { SignedOrder } from "../hooks/useEIP712Order";
-
-// ─────────────────────────────────────────────
-// Configuration
-// ─────────────────────────────────────────────
-
-/** URL base của Matching Engine API Service */
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_MATCHING_API_URL ?? "http://localhost:8000";
-
-/** URL WebSocket của Matching Engine */
-const WS_BASE_URL =
-  process.env.NEXT_PUBLIC_MATCHING_WS_URL ?? "ws://localhost:8000";
-
-// ─────────────────────────────────────────────
-// API Response Types
-// ─────────────────────────────────────────────
-
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  timestamp: number;
-}
-
-/** Trạng thái lệnh trên Engine */
-export type OrderStatus =
-  | "NEW"
-  | "ACTIVE"
-  | "PARTIALLY_FILLED"
-  | "FILLED"
-  | "ROLLED_OVER"
-  | "EXPIRED"
-  | "CANCELLED";
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_MATCHING_API_URL ?? "http://localhost:8000";
+const WS_BASE_URL = process.env.NEXT_PUBLIC_MATCHING_WS_URL ?? "ws://localhost:8000";
+export interface ApiResponse<T> { success: boolean; data?: T; error?: string; timestamp: number }
+export const ORDER_STATUSES = ["NEW", "ACTIVE", "PARTIALLY_FILLED", "FILLED", "ROLLED_OVER", "EXPIRED", "CANCELLED", "REJECTED", "ONCHAIN_PENDING", "SETTLED_FINAL"] as const;
+export type OrderStatus = typeof ORDER_STATUSES[number];
 export interface OrderBookEntry {
-  orderId: string;
-  trader: string;
-  orderType: "BID" | "ASK";
-  tokenId: string;
-  amount: string;
-  remainingAmount: string;
-  pricePerUnit: string;
-  status: OrderStatus;
-  createdAt: number;
+  orderId: string; trader: string; orderType: "BID" | "ASK"; tokenId: string;
+  amount: string; remainingAmount: string; pricePerUnit: string; status: OrderStatus;
+  createdAt?: number; rolloverCount?: number;
+}
+export interface OrderBookSnapshot { tokenId: string; bids: OrderBookEntry[]; asks: OrderBookEntry[]; lastClearingPrice?: string }
+export interface CurrentSession {
+  sessionId: string; tokenId: string; phase: "CALL" | "MATCH" | "SETTLE";
+  cutoffAt: number; phaseEndsAt: number; durationSeconds: 300 | 900;
+}
+export interface MatchedPair { bidOrderId: string; askOrderId: string; matchAmount: string; clearingPrice: string; tradeHash: string }
+export interface SessionResult { sessionId: string; tokenId: string; clearingPrice: string; totalMatchedAmount: string; matchCount: number; matches: MatchedPair[]; executedAt: number }
+export interface SubmitOrderResponse { orderId: string; status: OrderStatus; message?: string }
+type JsonObject = Record<string, unknown>;
+function object(value: unknown): JsonObject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Phản hồi API không đúng cấu trúc.");
+  return value as JsonObject;
+}
+function field(data: JsonObject, camel: string, snake: string): unknown { return data[camel] ?? data[snake]; }
+function string(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value) throw new Error(`API thiếu ${label}.`);
+  return value;
+}
+function uint(value: unknown, label: string): string {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
+  if (typeof value === "string" && /^\d+$/.test(value)) return value;
+  throw new Error(`API trả ${label} không phải chuỗi số nguyên an toàn.`);
+}
+function safeInteger(value: unknown, label: string): number {
+  const parsed = uint(value, label);
+  if (BigInt(parsed) > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`API trả ${label} vượt giới hạn số nguyên an toàn.`);
+  return Number(parsed);
+}
+function status(value: unknown): OrderStatus {
+  if (!ORDER_STATUSES.includes(value as OrderStatus)) throw new Error("API trả trạng thái lệnh chưa được hỗ trợ.");
+  return value as OrderStatus;
+}
+export function normalizeOrder(value: unknown): OrderBookEntry {
+  const data = object(value);
+  const type = field(data, "orderType", "order_type");
+  if (![0, 1, "BID", "ASK"].includes(type as string | number)) throw new Error("API trả loại lệnh không hợp lệ.");
+  const amount = uint(data.amount, "amount");
+  const remaining = uint(field(data, "remainingAmount", "remaining_amount"), "remaining_amount");
+  if (BigInt(remaining) > BigInt(amount)) throw new Error("Khối lượng còn lại vượt tổng khối lượng lệnh.");
+  return {
+    orderId: string(field(data, "orderId", "order_id"), "order_id"),
+    trader: string(data.trader ?? data.trader_address, "trader"),
+    orderType: type === 0 || type === "BID" ? "BID" : "ASK",
+    tokenId: uint(field(data, "tokenId", "token_id"), "token_id"),
+    amount,
+    remainingAmount: remaining,
+    pricePerUnit: uint(field(data, "pricePerUnit", "price_per_unit"), "price_per_unit"),
+    status: status(data.status),
+    ...(field(data, "rolloverCount", "rollover_count") !== undefined ? { rolloverCount: safeInteger(field(data, "rolloverCount", "rollover_count"), "rollover_count") } : {}),
+  };
+}
+function describeError(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(item => typeof item === "object" && item ? String((item as JsonObject).msg ?? "Dữ liệu không hợp lệ") : String(item)).join("; ");
+  return "Matching Engine từ chối yêu cầu.";
 }
 
-export interface OrderBookSnapshot {
-  tokenId: string;
-  bids: OrderBookEntry[];
-  asks: OrderBookEntry[];
-  lastUpdated: number;
-  /** Giá khớp phiên gần nhất (micro-USDC) */
-  lastClearingPrice?: string;
-}
-
-export interface SessionResult {
-  sessionId: string;
-  tokenId: string;
-  clearingPrice: string;
-  totalMatchedAmount: string;
-  matchCount: number;
-  matches: MatchedPair[];
-  executedAt: number;
-}
-
-export interface MatchedPair {
-  bidOrderId: string;
-  askOrderId: string;
-  matchAmount: string;
-  clearingPrice: string;
-  tradeHash: string;
-}
-
-export interface SubmitOrderResponse {
-  orderId: string;
-  status: OrderStatus;
-  message: string;
-}
-
-// ─────────────────────────────────────────────
-// REST API Client
-// ─────────────────────────────────────────────
-
-class MatchingApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
+export class MatchingApiClient {
+  constructor(private baseUrl = API_BASE_URL, private fetcher: typeof fetch = (input, init) => fetch(input, init), private timeoutMs = 10000) {
+    this.baseUrl = baseUrl.replace(/\/$/, "");
   }
-
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown
-  ): Promise<ApiResponse<T>> {
+  private async request<T>(method: string, path: string, body: unknown, parse: (value: unknown) => T): Promise<ApiResponse<T>> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: body ? JSON.stringify(body) : undefined,
+      const response = await this.fetcher(`${this.baseUrl}/api/v1${path}`, {
+        method, headers: { "Content-Type": "application/json" }, signal: controller.signal,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}), cache: "no-store",
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error:
-            errorData.detail ??
-            errorData.error ??
-            `HTTP ${response.status}: ${response.statusText}`,
-          timestamp: Date.now(),
-        };
-      }
-
-      const data = await response.json();
+      const payload: unknown = await response.json();
+      const data = object(payload);
+      if (!response.ok || data.success === false) throw new Error(describeError(data.detail ?? data.error ?? `HTTP ${response.status}`));
+      return { success: true, data: parse(data.success === true ? data.data : payload), timestamp: Date.now() };
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : "Lỗi không xác định";
+      return { success: false, error: controller.signal.aborted ? "Matching Engine phản hồi quá lâu. Kiểm tra trạng thái lệnh trước khi gửi lại." : detail, timestamp: Date.now() };
+    } finally { clearTimeout(timer); }
+  }
+  submitOrder(order: SignedOrder): Promise<ApiResponse<SubmitOrderResponse>> {
+    return this.request("POST", "/orders", {
+      order_id: order.orderId, trader: order.trader, order_type: order.orderType,
+      token_id: order.tokenId, amount: order.amount, price_per_unit: order.pricePerUnit,
+      time_in_force: order.timeInForce, nonce: order.nonce, deadline: order.deadline,
+      signature: order.signature, chain_id: order.chainId, verifying_contract: order.verifyingContract,
+    }, value => {
+      const data = object(value);
+      const orderId = string(field(data, "orderId", "order_id"), "order_id");
+      if (orderId.toLowerCase() !== order.orderId.toLowerCase()) throw new Error("API xác nhận sai mã lệnh.");
+      return { orderId, status: status(data.status), ...(typeof data.message === "string" ? { message: data.message } : {}) };
+    });
+  }
+  getOrder(orderId: string): Promise<ApiResponse<OrderBookEntry>> {
+    return this.request("GET", `/orders/${encodeURIComponent(orderId)}`, undefined, value => {
+      const order = normalizeOrder(value);
+      if (order.orderId.toLowerCase() !== orderId.toLowerCase()) throw new Error("API trả sai mã lệnh.");
+      return order;
+    });
+  }
+  cancelOrder(orderId: string, trader: string, signature: string): Promise<ApiResponse<SubmitOrderResponse>> {
+    return this.request("DELETE", `/orders/${encodeURIComponent(orderId)}`, { trader, signature }, value => {
+      const data = object(value);
+      return { orderId: string(field(data, "orderId", "order_id"), "order_id"), status: status(data.status) };
+    });
+  }
+  getOrderBook(tokenId: string): Promise<ApiResponse<OrderBookSnapshot>> {
+    return this.request("GET", `/orderbook/${encodeURIComponent(tokenId)}`, undefined, value => {
+      const data = object(value);
+      const returnedId = field(data, "tokenId", "token_id");
+      if (returnedId !== undefined && uint(returnedId, "token_id") !== tokenId) throw new Error("API trả sổ lệnh của token khác.");
+      if (!Array.isArray(data.bids) || !Array.isArray(data.asks)) throw new Error("API thiếu bids/asks.");
+      const bids = data.bids.map(normalizeOrder), asks = data.asks.map(normalizeOrder);
+      if (bids.some(order => order.orderType !== "BID") || asks.some(order => order.orderType !== "ASK")) throw new Error("API đặt lệnh sai phía mua/bán.");
+      if ([...bids, ...asks].some(order => order.tokenId !== tokenId)) throw new Error("Sổ lệnh chứa tokenId khác; khớp chéo token chưa được bật.");
+      const lastPrice = field(data, "lastClearingPrice", "last_clearing_price");
+      return { tokenId, bids, asks, ...(lastPrice !== undefined ? { lastClearingPrice: uint(lastPrice, "last_clearing_price") } : {}) };
+    });
+  }
+  getCurrentSession(tokenId: string): Promise<ApiResponse<CurrentSession>> {
+    return this.request("GET", `/sessions/current?token_id=${encodeURIComponent(tokenId)}`, undefined, value => {
+      const data = object(value);
+      const phase = data.phase;
+      if (!["CALL", "MATCH", "SETTLE"].includes(phase as string)) throw new Error("API trả giai đoạn phiên không hợp lệ.");
+      const duration = safeInteger(field(data, "durationSeconds", "duration_seconds"), "duration_seconds");
+      if (duration !== 300 && duration !== 900) throw new Error("Chu kỳ phiên phải là 300 hoặc 900 giây theo ADR-001.");
       return {
-        success: true,
-        data: data as T,
-        timestamp: Date.now(),
+        sessionId: string(field(data, "sessionId", "session_id"), "session_id"), tokenId,
+        phase: phase as CurrentSession["phase"], durationSeconds: duration,
+        cutoffAt: safeInteger(field(data, "cutoffAt", "cutoff_at"), "cutoff_at"),
+        phaseEndsAt: safeInteger(field(data, "phaseEndsAt", "phase_ends_at"), "phase_ends_at"),
       };
-    } catch (err) {
-      return {
-        success: false,
-        error:
-          err instanceof Error
-            ? `Không thể kết nối Matching Engine: ${err.message}`
-            : "Lỗi không xác định",
-        timestamp: Date.now(),
-      };
-    }
-  }
-
-  // ── POST /api/v1/orders ──────────────────
-
-  /**
-   * Gửi lệnh đã ký EIP-712 lên Matching Engine.
-   * Không tốn gas – lệnh được xử lý off-chain.
-   */
-  async submitOrder(
-    signedOrder: SignedOrder
-  ): Promise<ApiResponse<SubmitOrderResponse>> {
-    return this.request<SubmitOrderResponse>("POST", "/api/v1/orders", {
-      order_id: signedOrder.orderId,
-      trader: signedOrder.trader,
-      order_type: signedOrder.orderType, // 0=BID, 1=ASK
-      token_id: signedOrder.tokenId,
-      amount: signedOrder.amount,
-      price_per_unit: signedOrder.pricePerUnit,
-      nonce: signedOrder.nonce,
-      deadline: signedOrder.deadline,
-      signature: signedOrder.signature,
-      chain_id: signedOrder.chainId,
     });
-  }
-
-  // ── DELETE /api/v1/orders/{orderId} ──────
-
-  /**
-   * Hủy lệnh off-chain (trước khi bị khớp).
-   * Chỉ trader tạo lệnh mới có quyền hủy.
-   */
-  async cancelOrder(
-    orderId: string,
-    traderAddress: string,
-    signature: string
-  ): Promise<ApiResponse<{ orderId: string; status: string }>> {
-    return this.request("DELETE", `/api/v1/orders/${orderId}`, {
-      trader: traderAddress,
-      signature,
-    });
-  }
-
-  // ── GET /api/v1/orderbook/{tokenId} ──────
-
-  /**
-   * Lấy snapshot sổ lệnh hiện tại cho một tokenId.
-   * Dùng để render Order Book UI và Depth Chart.
-   */
-  async getOrderBook(
-    tokenId: string
-  ): Promise<ApiResponse<OrderBookSnapshot>> {
-    return this.request<OrderBookSnapshot>(
-      "GET",
-      `/api/v1/orderbook/${tokenId}`
-    );
-  }
-
-  // ── POST /api/v1/sessions/run ────────────
-
-  /**
-   * Kích hoạt chạy phiên khớp lệnh (Periodic Double Auction).
-   * Thường chỉ dùng cho admin/testing; production chạy tự động theo chu kỳ.
-   */
-  async triggerSession(
-    tokenId: string
-  ): Promise<ApiResponse<SessionResult>> {
-    return this.request<SessionResult>("POST", "/api/v1/sessions/run", {
-      token_id: tokenId,
-    });
-  }
-
-  // ── GET /api/v1/sessions/latest ──────────
-
-  /**
-   * Lấy kết quả phiên khớp lệnh gần nhất.
-   */
-  async getLatestSession(
-    tokenId: string
-  ): Promise<ApiResponse<SessionResult>> {
-    return this.request<SessionResult>(
-      "GET",
-      `/api/v1/sessions/latest?token_id=${tokenId}`
-    );
   }
 }
 
-// ─────────────────────────────────────────────
-// WebSocket Client
-// ─────────────────────────────────────────────
-
-export type WSEventType =
-  | "orderbook_update"    // Sổ lệnh thay đổi (lệnh mới / hủy / khớp)
-  | "trade_executed"      // Có cặp lệnh vừa được khớp
-  | "session_completed"   // Phiên đấu giá kết thúc
-  | "price_update";       // Giá clearing mới
-
-export interface WSMessage {
-  event: WSEventType;
-  data: unknown;
-  timestamp: number;
-}
-
-type WSEventHandler = (message: WSMessage) => void;
-
-class OrderBookWebSocket {
+export const WS_EVENTS = ["orderbook.update", "match.executed", "settlement.confirmed", "settlement.failed", "session.completed", "price.update"] as const;
+export type WSEventType = typeof WS_EVENTS[number];
+export interface WSMessage { event: WSEventType; data: unknown; timestamp?: number }
+const aliases: Record<string, WSEventType> = { orderbook_update: "orderbook.update", trade_executed: "match.executed", session_completed: "session.completed", price_update: "price.update" };
+export class OrderBookWebSocket {
   private ws: WebSocket | null = null;
-  private handlers: Map<WSEventType, WSEventHandler[]> = new Map();
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 2000; // ms
-  private tokenId: string;
-
-  constructor(tokenId: string) {
-    this.tokenId = tokenId;
-  }
-
-  /** Mở kết nối WebSocket tới Matching Engine */
+  private handlers = new Map<WSEventType, Set<(message: WSMessage) => void>>();
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private attempts = 0;
+  private stopped = true;
+  constructor(private tokenId: string, private baseUrl = WS_BASE_URL, private createSocket = (url: string) => new WebSocket(url), private reconnectDelay = 2000) {}
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    const url = `${WS_BASE_URL}/ws/orderbook/${this.tokenId}`;
-
+    if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
+    this.stopped = false;
     try {
-      this.ws = new WebSocket(url);
-
-      this.ws.onopen = () => {
-        console.log(`[WS] Đã kết nối sổ lệnh token #${this.tokenId}`);
-        this.reconnectAttempts = 0;
-      };
-
-      this.ws.onmessage = (event) => {
+      const socket = this.createSocket(`${this.baseUrl.replace(/\/$/, "")}/ws/orderbook/${encodeURIComponent(this.tokenId)}`);
+      this.ws = socket;
+      socket.onopen = () => { this.attempts = 0; };
+      socket.onmessage = event => {
+        if (this.stopped || this.ws !== socket) return;
         try {
-          const message: WSMessage = JSON.parse(event.data);
-          const eventHandlers = this.handlers.get(message.event) ?? [];
-          for (const handler of eventHandlers) {
-            handler(message);
-          }
-        } catch (err) {
-          console.error("[WS] Lỗi parse message:", err);
-        }
+          const raw = object(JSON.parse(event.data));
+          const name = typeof raw.event === "string" ? aliases[raw.event] ?? raw.event : "";
+          if (!WS_EVENTS.includes(name as WSEventType)) return;
+          const message: WSMessage = { event: name as WSEventType, data: raw.data };
+          this.handlers.get(message.event)?.forEach(handler => handler(message));
+        } catch { /* Ignore malformed messages; REST polling remains authoritative. */ }
       };
-
-      this.ws.onclose = () => {
-        console.log(`[WS] Mất kết nối token #${this.tokenId}`);
-        this.tryReconnect();
-      };
-
-      this.ws.onerror = (err) => {
-        console.error("[WS] Lỗi:", err);
-      };
-    } catch (err) {
-      console.error("[WS] Không thể tạo kết nối:", err);
-    }
+      socket.onclose = () => { if (this.ws === socket) { this.ws = null; this.reconnect(); } };
+      socket.onerror = () => { /* onclose schedules reconnect. */ };
+    } catch { this.reconnect(); }
   }
-
-  /** Đăng ký lắng nghe sự kiện */
-  on(event: WSEventType, handler: WSEventHandler): void {
-    const existing = this.handlers.get(event) ?? [];
-    existing.push(handler);
-    this.handlers.set(event, existing);
+  on(event: WSEventType, handler: (message: WSMessage) => void): void {
+    const handlers = this.handlers.get(event) ?? new Set(); handlers.add(handler); this.handlers.set(event, handlers);
   }
-
-  /** Hủy lắng nghe sự kiện */
-  off(event: WSEventType, handler: WSEventHandler): void {
-    const existing = this.handlers.get(event) ?? [];
-    this.handlers.set(
-      event,
-      existing.filter((h) => h !== handler)
-    );
-  }
-
-  /** Ngắt kết nối */
   disconnect(): void {
-    this.reconnectAttempts = this.maxReconnectAttempts; // Ngăn reconnect
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.stopped = true;
+    clearTimeout(this.reconnectTimer);
+    const socket = this.ws;
+    this.ws = null;
+    if (socket) { socket.onclose = null; socket.onmessage = null; socket.onopen = null; socket.close(); }
     this.handlers.clear();
   }
-
-  /** Tự động reconnect với exponential backoff */
-  private tryReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[WS] Đã vượt quá số lần thử kết nối lại.");
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    console.log(`[WS] Thử kết nối lại sau ${delay}ms (lần ${this.reconnectAttempts})...`);
-
-    setTimeout(() => this.connect(), delay);
+  private reconnect(): void {
+    if (this.stopped || this.attempts >= 5) return;
+    clearTimeout(this.reconnectTimer);
+    const delay = this.reconnectDelay * 2 ** this.attempts++;
+    this.reconnectTimer = setTimeout(() => { if (!this.stopped) this.connect(); }, delay);
   }
-
-  /** Trạng thái kết nối hiện tại */
-  get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
+  get isConnected(): boolean { return this.ws?.readyState === 1; }
 }
-
-// ─────────────────────────────────────────────
-// Singleton Exports
-// ─────────────────────────────────────────────
-
-/** REST API client instance */
 export const matchingApi = new MatchingApiClient();
-
-/** Tạo WebSocket client cho một tokenId */
-export function createOrderBookWS(tokenId: string): OrderBookWebSocket {
-  return new OrderBookWebSocket(tokenId);
-}
-
-export { MatchingApiClient, OrderBookWebSocket };
+export function createOrderBookWS(tokenId: string): OrderBookWebSocket { return new OrderBookWebSocket(tokenId); }

@@ -1,0 +1,60 @@
+{
+  "name": "Carbon Credit - Dự án Trồng Rừng Phòng Hộ Tây Bắc (2026)",
+  "description": "Verified Carbon Credit under standard Verra VCS + CCB",
+  "image": "ipfs://bafybeihdwdcefgh4dqkjv678projectcoverimage",
+  "decimals": 0,
+  "unit": "tCO2e",
+  "price_unit": "USDC",
+  "price_decimals": 6,
+  "properties": {
+    "project_id": "VN-FOR-2026-001",
+    "standard": "Verra VCS + CCB",
+    "methodology": "VM0015 - Avoided Unplanned Deforestation",
+    "project_type": "FORESTRY_AFOLU",
+    "vintage_year": 2026,
+    "vintage_period": {
+      "start_date": "2026-01-01",
+      "end_date": "2026-12-31"
+    },
+    "total_issued_tCO2e": 5000,
+    "serial_number_range": {
+      "start": "VCS-2026-VN-FOR-001-00001",
+      "end": "VCS-2026-VN-FOR-001-05000"
+    },
+    "country": "VN",
+    "region": "Sơn La",
+    "coordinates": {
+      "latitude": 21.3269,
+      "longitude": 103.9188
+    },
+    "developer": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    "developer_name": "Công ty TNHH Trồng Rừng Xanh Tây Bắc",
+    "verifier": "EPU_Decentralized_Carbon_Auditor",
+    "verified_at": 1794268800,
+    "verification_report_uri": "ipfs://QmVerifReport1234abcdef567890",
+    "status": "VERIFIED_ACTIVE",
+    "sdg_contributions": [
+      {
+        "sdg_number": 13,
+        "sdg_name": "Climate Action",
+        "contribution_description": "Giảm 5000 tCO2e/năm"
+      },
+      {
+        "sdg_number": 15,
+        "sdg_name": "Life on Land",
+        "contribution_description": "Phục hồi 200ha rừng"
+      }
+    ],
+    "additionality": "PROVEN",
+    "permanence_risk_buffer": 20,
+    "corresponding_adjustment": false,
+    "asset_class": "forestry",
+    "vintage_window": {
+      "start_year": 2026,
+      "end_year": 2026
+    },
+    "standard_category": "Verra_VCS",
+    "is_fungible_pool": true,
+    "fungibility_group_id": "forestry_2026-2026_Verra_VCS"
+  }
+}
