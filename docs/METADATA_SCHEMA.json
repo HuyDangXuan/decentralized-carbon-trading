@@ -38,7 +38,26 @@
     "decimals": {
       "type": "integer",
       "default": 0,
-      "description": "Số chữ số thập phân theo chuẩn ERC-1155. Tín chỉ carbon tính theo tấn nguyên (tCO2e), mặc định = 0."
+      "description": "Số chữ số thập phân theo chuẩn ERC-1155. Đồng bộ với smart contract CarbonCredit1155.sol: decimals=0 khi đơn vị là tCO2e (tấn nguyên), decimals=3 khi đơn vị là kgCO2e. Mặc định = 0 (tCO2e)."
+    },
+
+    "unit": {
+      "type": "string",
+      "enum": ["tCO2e", "kgCO2e"],
+      "default": "tCO2e",
+      "description": "Đơn vị đo lường tín chỉ carbon. 'tCO2e' = tấn CO2 tương đương (decimals=0), 'kgCO2e' = kilogram CO2 tương đương (decimals=3). Giải quyết mơ hồ đơn vị D1 giữa frontend và smart contract."
+    },
+
+    "price_unit": {
+      "type": "string",
+      "default": "USDC",
+      "description": "Đơn vị tiền tệ dùng để định giá tín chỉ trên sàn giao dịch. Mặc định là USDC (USD Coin). Giải quyết mơ hồ D3 về loại stablecoin."
+    },
+
+    "price_decimals": {
+      "type": "integer",
+      "default": 6,
+      "description": "Số chữ số thập phân của đơn vị giá (price_unit). USDC trên EVM sử dụng 6 decimals. Giải quyết mơ hồ D3 về cách parse giá trị USDC on-chain."
     },
 
     "properties": {
@@ -108,6 +127,60 @@
             "BLUE_CARBON",
             "AGRICULTURE",
             "OTHER"
+          ]
+        },
+
+        "asset_class": {
+          "type": "string",
+          "description": "Phân lớp tài sản tín chỉ để gom nhóm thanh khoản trên sổ lệnh (Credit Fungibility). Các lô tín chỉ cùng asset_class, cùng vintage_window và cùng standard_category được coi là thay thế lẫn nhau (fungible) khi giao dịch. Giải quyết vấn đề T1 & T3.",
+          "enum": [
+            "forestry",
+            "renewable_energy",
+            "waste_treatment",
+            "energy_efficiency",
+            "cookstove",
+            "blue_carbon",
+            "agriculture",
+            "transport",
+            "industrial_gas",
+            "other"
+          ],
+          "examples": ["forestry", "renewable_energy"]
+        },
+
+        "standard_category": {
+          "type": "string",
+          "description": "Nhóm tiêu chuẩn chứng nhận, dùng kết hợp với asset_class và vintage_window để xác định nhóm thanh khoản (liquidity pool) trên sổ lệnh.",
+          "enum": [
+            "Verra_VCS",
+            "Gold_Standard",
+            "CDM",
+            "Vietnam_VCM",
+            "Article_6_4"
+          ],
+          "examples": ["Verra_VCS", "Gold_Standard"]
+        },
+
+        "vintage_window": {
+          "type": "string",
+          "description": "Cửa sổ vintage để gom nhóm thanh khoản. Các lô cùng vintage_window có thể khớp lệnh chéo trên sổ lệnh. Định dạng: '{năm_bắt_đầu}-{năm_kết_thúc}' hoặc '{năm}' (đơn năm).",
+          "pattern": "^[0-9]{4}(-[0-9]{4})?$",
+          "examples": ["2026", "2025-2027"]
+        },
+
+        "is_fungible_pool": {
+          "type": "boolean",
+          "default": false,
+          "description": "Đánh dấu lô tín chỉ này thuộc pool gom nhóm thanh khoản (fungible pool). Khi true, Engine có thể khớp lệnh chéo giữa các tokenId cùng asset_class + standard_category + vintage_window. Giải quyết T1."
+        },
+
+        "fungibility_pool_id": {
+          "type": "string",
+          "description": "Mã định danh pool gom nhóm. Tự động sinh từ: '{asset_class}_{standard_category}_{vintage_window}'. Dùng để lọc và hiển thị sổ lệnh trên UI.",
+          "pattern": "^[a-z_]+_[A-Za-z_]+_[0-9]{4}(-[0-9]{4})?$",
+          "examples": [
+            "forestry_Verra_VCS_2026",
+            "renewable_energy_Gold_Standard_2025-2027"
           ]
         },
 
@@ -334,6 +407,71 @@
           "description": "Đánh dấu tín chỉ đã được điều chỉnh tương ứng (Corresponding Adjustment) theo Điều 6 Thỏa thuận Paris, tránh double counting giữa các quốc gia."
         },
 
+        "asset_class": {
+          "type": "string",
+          "description": "Phân loại lớp tài sản tín chỉ cho mục đích gom nhóm thanh khoản trên sổ lệnh (order book). Dùng bởi engine giao dịch để nhóm các tín chỉ có tính chất tương đồng.",
+          "enum": [
+            "forestry",
+            "renewable_energy",
+            "waste_treatment",
+            "cookstove",
+            "blue_carbon",
+            "industrial_gas",
+            "agriculture",
+            "transport",
+            "other"
+          ]
+        },
+
+        "vintage_window": {
+          "type": "object",
+          "description": "Cửa sổ vintage cho phép gom nhóm tín chỉ theo khoảng năm. Ví dụ: start_year=2025, end_year=2027 cho phép ghép lệnh các tín chỉ vintage 2025-2027 trong cùng nhóm thanh khoản.",
+          "properties": {
+            "start_year": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100,
+              "description": "Năm bắt đầu cửa sổ vintage (bao gồm)."
+            },
+            "end_year": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100,
+              "description": "Năm kết thúc cửa sổ vintage (bao gồm). Phải >= start_year."
+            }
+          },
+          "required": ["start_year", "end_year"]
+        },
+
+        "standard_category": {
+          "type": "string",
+          "description": "Danh mục tiêu chuẩn rút gọn dùng cho phân nhóm fungibility. Ánh xạ từ trường 'standard' sang nhóm đơn giản hơn để engine giao dịch ghép lệnh.",
+          "enum": [
+            "Verra_VCS",
+            "Gold_Standard",
+            "CDM",
+            "Vietnam_VCM",
+            "Article_6_4"
+          ]
+        },
+
+        "is_fungible_pool": {
+          "type": "boolean",
+          "default": false,
+          "description": "Đánh dấu tín chỉ này có thể được gộp vào pool thanh khoản chung với các tín chỉ tương đồng (cùng asset_class, vintage_window, standard_category) để ghép lệnh trên order book."
+        },
+
+        "fungibility_group_id": {
+          "type": "string",
+          "description": "Mã nhóm fungibility được tính toán tự động theo công thức: '{asset_class}_{vintage_year}_{standard_category}'. Engine giao dịch dùng trường này để ghép lệnh mua/bán xuyên tokenId trong cùng nhóm.",
+          "pattern": "^[a-z_]+_[0-9]{4}_[A-Za-z_]+$",
+          "examples": [
+            "forestry_2026_Verra_VCS",
+            "cookstove_2026_Gold_Standard",
+            "renewable_energy_2025_CDM"
+          ]
+        },
+
         "content_hash": {
           "type": "string",
           "pattern": "^0x[a-fA-F0-9]{64}$",
@@ -356,6 +494,9 @@
         "description": "Verified Carbon Credit under standard Verra VCS + CCB",
         "image": "ipfs://bafybeihdwdcefgh4dqkjv678projectcoverimage",
         "decimals": 0,
+        "unit": "tCO2e",
+        "price_unit": "USDC",
+        "price_decimals": 6,
         "properties": {
           "project_id": "VN-FOR-2026-001",
           "standard": "Verra VCS + CCB",
@@ -390,6 +531,14 @@
           "additionality": "PROVEN",
           "permanence_risk_buffer": 20,
           "corresponding_adjustment": false,
+          "asset_class": "forestry",
+          "vintage_window": {
+            "start_year": 2026,
+            "end_year": 2026
+          },
+          "standard_category": "Verra_VCS",
+          "is_fungible_pool": true,
+          "fungibility_group_id": "forestry_2026_Verra_VCS",
           "content_hash": "0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456"
         }
       }
@@ -402,6 +551,9 @@
         "description": "Verified Carbon Credit under standard Gold Standard VER",
         "image": "ipfs://bafybeigoldstandardprojectimage",
         "decimals": 0,
+        "unit": "tCO2e",
+        "price_unit": "USDC",
+        "price_decimals": 6,
         "properties": {
           "project_id": "GS-9012",
           "standard": "Gold Standard VER",
@@ -429,6 +581,14 @@
           ],
           "additionality": "PROVEN",
           "corresponding_adjustment": true,
+          "asset_class": "cookstove",
+          "vintage_window": {
+            "start_year": 2026,
+            "end_year": 2026
+          },
+          "standard_category": "Gold_Standard",
+          "is_fungible_pool": true,
+          "fungibility_group_id": "cookstove_2026_Gold_Standard",
           "content_hash": "0xb2c3d4e5f6a7890123456789012345678901abcdef234567890abcdef1234567"
         }
       }

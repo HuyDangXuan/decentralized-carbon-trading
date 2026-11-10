@@ -11,3 +11,14 @@ export {
   useSetApprovalForAll,
   useWatchCarbonRetiredEvents,
 } from "./useCarbonCredit";
+export {
+  useEIP712Order,
+  OrderType,
+  usdToMicroUsdc,
+  microUsdcToUsd,
+} from "./useEIP712Order";
+export type {
+  OrderParams,
+  SignedOrder,
+  UseEIP712OrderReturn,
+} from "./useEIP712Order";
