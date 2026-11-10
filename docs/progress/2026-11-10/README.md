@@ -43,11 +43,20 @@
 5. **`docs/progress/README.md` & `docs/progress/2026-11-10/README.md`:**
    - Hệ thống theo dõi tiến độ và nhật ký kỹ thuật hàng ngày do Chủ nhiệm đề tài quản lý trực tiếp trên `main`.
 
+6. **`scripts/log_daily_progress.py` (Script tự động hóa CLI):**
+   - Công cụ dòng lệnh Python hỗ trợ quét Git changes, tự động tạo cấu trúc thư mục ngày, cập nhật dashboard và push lên `main` chỉ bằng 1 lệnh `python scripts/log_daily_progress.py --push`.
+
+7. **`.gemini/skills/lead-architect-progress-logger/SKILL.md` (AI Sub-Agent độc quyền cho Huy):**
+   - Kỹ năng AI ảo tự động hóa việc ghi nhận tiến độ, kiểm tra spec và đồng bộ tài liệu kiến trúc.
+
 ---
 
 ### 2.2 Các tệp chỉnh sửa (Modified Files)
 
-1. **`docs/SYSTEM_ARCHITECTURE.md`:**
+1. **`docs/HUONG_DAN_SU_DUNG_SUB_AGENTS.md`:**
+   - Bổ sung AI Sub-Agent thứ 7 `lead-architect-progress-logger` vào sơ đồ Mermaid, bảng phân công 2.1 và mẫu câu lệnh Prompt Mẫu 7.
+
+2. **`docs/SYSTEM_ARCHITECTURE.md`:**
    - Cập nhật phiên bản 2.0: Tích hợp mô hình lai **Off-chain Intelligence (FastAPI MAS), On-chain Trust (Polygon Amoy)**.
    - Bổ sung 4 quyết định kiến trúc từ ADR-001.
    - Thêm sơ đồ Mermaid luồng 3 bên và máy trạng thái lệnh.
