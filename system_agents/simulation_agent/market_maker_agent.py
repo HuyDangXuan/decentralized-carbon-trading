@@ -33,12 +33,17 @@ class SimulatedTraderAgent:
         self.valuation = valuation      # Giá trị kỳ vọng nội tại (True valuation)
         self.profit_margin = random.uniform(0.05, 0.20)  # Biên độ kỳ vọng 5% - 20%
 
+    @staticmethod
+    def _to_micro_usdc(usd: float) -> int:
+        """Đổi USD sang số nguyên micro-USDC (1 USD = 10^6), tối thiểu 1 để lệnh hợp lệ."""
+        return max(1, int(round(usd * 1_000_000)))
+
     def generate_order(self, token_id: int) -> Order:
         """Tạo lệnh chào mua hoặc chào bán dựa trên chiến lược lợi nhuận"""
         amount = random.randint(10, 100)
         if self.trader_type == "BUYER":
             # Người mua muốn mua dưới giá định giá của mình
-            price = round(self.valuation * (1 - self.profit_margin), 2)
+            price = self._to_micro_usdc(self.valuation * (1 - self.profit_margin))
             return Order(
                 order_id=f"BID_{self.trader_id}_{int(time.time()*1000)%10000}",
                 trader_id=self.trader_id,
@@ -49,7 +54,7 @@ class SimulatedTraderAgent:
             )
         else:
             # Người bán muốn bán trên giá thành chi phí (valuation) của mình
-            price = round(self.valuation * (1 + self.profit_margin), 2)
+            price = self._to_micro_usdc(self.valuation * (1 + self.profit_margin))
             return Order(
                 order_id=f"ASK_{self.trader_id}_{int(time.time()*1000)%10000}",
                 trader_id=self.trader_id,
@@ -84,7 +89,7 @@ def run_simulation(num_buyers=10, num_sellers=10, token_id=101):
     matches = auction_engine.run_periodic_double_auction(token_id)
 
     total_volume = sum(m.amount for m in matches)
-    total_value = sum(m.amount * m.clearing_price for m in matches)
+    total_value = sum(m.amount * m.clearing_price for m in matches) / 1_000_000  # micro-USDC -> USD
     avg_price = total_value / total_volume if total_volume > 0 else 0
 
     print(f"\n[KẾT QUẢ KHỚP LỆNH THỰC NGHIỆM]")

@@ -8,12 +8,12 @@ import random
 import sys
 import unittest
 
-_SIM_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SIM_DIR not in sys.path:
-    sys.path.insert(0, _SIM_DIR)
-_ENGINE_DIR = os.path.dirname(_SIM_DIR)
+_ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ENGINE_DIR not in sys.path:
     sys.path.insert(0, _ENGINE_DIR)
+_SIM_DIR = os.path.join(_ENGINE_DIR, "simulation")
+if _SIM_DIR not in sys.path:
+    sys.path.insert(0, _SIM_DIR)
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     try:
@@ -24,7 +24,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 from session_engine import BookOrder, Fill, match_session
 from session_engine import end_session
 from order_book import Order, OrderType
-from auction_agent import DoubleAuctionAgent
+from baseline_agent import BaselineAuctionAgent as DoubleAuctionAgent  # baseline cũ làm đối chứng
 
 
 class TestSessionEngine(unittest.TestCase):
@@ -421,42 +421,40 @@ class TestSessionEngine(unittest.TestCase):
     # 2. Bộ test toàn diện cho end_session (J4, spec §6)
     # =========================================================================
 
-    def test_regression_a_hamilton_tie_break_by_remaining_then_order_id(self):
-        """(a) Phá hòa Hamilton: trong nhóm biên cùng giá, cùng tuổi, phần dư thập phân bằng nhau
-        thì lệnh có remaining lớn hơn nhận đơn vị dư trước, rồi mới đến order_id tăng dần.
+    def test_regression_a_hamilton_tie_break_fifo_then_order_id(self):
+        """(a) Phá hòa Hamilton theo ADR-001 / FR-08: trong nhóm biên cùng giá, cùng tuổi, phần dư
+        thập phân bằng nhau thì lệnh đến sớm hơn (seq nhỏ hơn) nhận đơn vị dư trước; seq bằng nhau
+        thì order_id tăng dần (để kết quả tất định).
 
-        Ví dụ từ hợp đồng:
-        BID A(giá 10, remaining 1, sessions_alive=0)
-        BID B(giá 10, remaining 3, sessions_alive=0)
-        ASK C(giá 5, remaining 2, sessions_alive=0)
-        -> V = 2. Nhóm biên giá 10 có A (rem 1) và B (rem 3). S = 4.
-        Base allocations:
-          A: (2 * 1) // 4 = 0, rem_i = (2 * 1) % 4 = 2 (2/4 = 0.5)
-          B: (2 * 3) // 4 = 1, rem_i = (2 * 3) % 4 = 2 (2/4 = 0.5)
-        Phần dư thập phân đều 0.5. R = 2 - 1 = 1 đơn vị dư.
-        Phá hòa: B có remaining = 3 > A có remaining = 1 nên B nhận 1 đơn vị dư:
-          B nhận 1 + 1 = 2; A nhận 0 + 0 = 0.
-        Test này bắt buộc fail nếu phá hòa theo order_id (A < B sẽ cho A nhận 1) hoặc đảo remaining.
+        BID A(giá 10, remaining 1, seq 2), BID B(giá 10, remaining 3, seq 1), ASK C(giá 5, remaining 2)
+        -> V = 2, S = 4. A: base 0, dư 2/4; B: base 1, dư 2/4. R = 1 đơn vị dư.
+        Phần dư bằng nhau; B đến sớm hơn (seq 1) nên B nhận 1 + 1 = 2, A nhận 0.
+        Đảo seq (A sớm hơn) thì A nhận đơn vị dư: A = 1, B = 1.
+        Test fail nếu phá hòa theo remaining hoặc theo order_id mà bỏ qua seq.
         """
-        orders = [
-            BookOrder(order_id="A", side="BID", price_ticks=10, remaining=1, sessions_alive=0),
-            BookOrder(order_id="B", side="BID", price_ticks=10, remaining=3, sessions_alive=0),
-            BookOrder(order_id="C", side="ASK", price_ticks=5, remaining=2, sessions_alive=0),
-        ]
-        fills = match_session(orders, tie_break="age_prorata")
-        self.assertEqual(len(fills), 1)
-        self.assertEqual(fills[0].bid_id, "B")
-        self.assertEqual(fills[0].ask_id, "C")
-        self.assertEqual(fills[0].amount, 2)
+        def book(seq_a, seq_b):
+            return [
+                BookOrder(order_id="A", side="BID", price_ticks=10, remaining=1, seq=seq_a),
+                BookOrder(order_id="B", side="BID", price_ticks=10, remaining=3, seq=seq_b),
+                BookOrder(order_id="C", side="ASK", price_ticks=5, remaining=2, seq=0),
+            ]
 
-        # Kiểm tra trường hợp hòa tiếp theo: cùng phần dư thập phân VÀ cùng remaining -> order_id tăng dần
-        # BID X1(rem 1, id "X1"), BID X2(rem 1, id "X2"), ASK Z(rem 1)
-        # S = 2, avail = 1. Cả hai có rem_i = 1/2, remaining = 1.
-        # "X1" < "X2" nên X1 nhận 1, X2 nhận 0.
+        def bid_alloc(fills):
+            out = {}
+            for f in fills:
+                out[f.bid_id] = out.get(f.bid_id, 0) + f.amount
+            return out
+
+        # B đến sớm hơn: B nhận phần dư (order_id "A" < "B" không có tác dụng vì seq quyết định trước)
+        self.assertEqual(bid_alloc(match_session(book(2, 1), tie_break="age_prorata")), {"B": 2})
+        # A đến sớm hơn: A nhận phần dư
+        self.assertEqual(bid_alloc(match_session(book(1, 2), tie_break="age_prorata")), {"A": 1, "B": 1})
+
+        # seq bằng nhau thì order_id tăng dần: X1 nhận 1, X2 nhận 0
         orders_tie_id = [
-            BookOrder(order_id="X2", side="BID", price_ticks=10, remaining=1, sessions_alive=0),
-            BookOrder(order_id="X1", side="BID", price_ticks=10, remaining=1, sessions_alive=0),
-            BookOrder(order_id="Z", side="ASK", price_ticks=5, remaining=1, sessions_alive=0),
+            BookOrder(order_id="X2", side="BID", price_ticks=10, remaining=1, seq=7),
+            BookOrder(order_id="X1", side="BID", price_ticks=10, remaining=1, seq=7),
+            BookOrder(order_id="Z", side="ASK", price_ticks=5, remaining=1),
         ]
         fills_id = match_session(orders_tie_id, tie_break="age_prorata")
         self.assertEqual(len(fills_id), 1)

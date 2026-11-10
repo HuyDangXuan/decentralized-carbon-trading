@@ -9,7 +9,7 @@ if _SIM_DIR not in sys.path:
     sys.path.insert(0, _SIM_DIR)
 
 from model import MatchResult, OrderType, TOKEN_ID, Valued, to_order
-from auction_agent import DoubleAuctionAgent
+from baseline_agent import BaselineAuctionAgent as DoubleAuctionAgent  # baseline cũ (float, giá theo cặp)
 
 
 def truthful(v: Valued) -> float:

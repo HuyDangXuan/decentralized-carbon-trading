@@ -120,10 +120,11 @@ def _allocate_side(
                     sum_base = sum(base_allocs.values())
                     R = rem_avail - sum_base
 
-                    # Phá hòa: (-rem_i, -remaining, order_id)
+                    # Phá hòa theo ADR-001 / FR-08: phần dư lớn hơn trước; bằng nhau thì
+                    # FIFO (seq nhỏ = đến sớm hơn); cuối cùng order_id để kết quả tất định.
                     sorted_sub = sorted(
                         subgroup,
-                        key=lambda o: (-rems[o.order_id], -o.remaining, o.order_id),
+                        key=lambda o: (-rems[o.order_id], o.seq, o.order_id),
                     )
 
                     for rank, o in enumerate(sorted_sub):
