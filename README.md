@@ -22,9 +22,35 @@ Dự án kết hợp giữa **Công nghệ Blockchain (ERC-1155, Smart Contracts
 > **Kênh thông tin duy nhất (Single Source of Truth - SSOT):** Mọi thay đổi kỹ thuật, tài liệu đặc tả, quyết định kiến trúc và phân công nhiệm vụ dù là nhỏ nhất đều được Chủ nhiệm đề tài (**Đặng Xuân Huy**) cập nhật liên tục trực tiếp lên nhánh `main`.
 
 - 📂 **Thư mục theo dõi tiến độ tổng thể:** [`docs/progress/`](docs/progress/README.md)
-- 📝 **Nhật ký mới nhất [10/11/2026]:** [`docs/progress/2026-11-10/`](docs/progress/2026-11-10/README.md) *(Khóa 4 thông số kiến trúc ADR-001, ban hành SRS IEEE 830, cập nhật kiến trúc v2.0 và hiệu chỉnh đề cương học thuật)*.
+- 📝 **Nhật ký mới nhất [11/11/2026]:** [`docs/progress/2026-11-11/`](docs/progress/2026-11-11/README.md) *(Hợp nhất toàn diện 3 phân hệ vào main, giải quyết xung đột Git, kiểm thử tích hợp chéo thành công và khởi tạo hệ thống giao việc docs/tasks/)*.
 - 📋 **Hồ sơ Đặc tả Yêu cầu Phần mềm SRS (IEEE 830):** [`docs/SRS_DOCUMENT.md`](docs/SRS_DOCUMENT.md)
 - ⚖️ **Quyết định Kiến trúc Cốt lõi (ADR-001):** [`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md)
+
+---
+
+## 🎯 HỆ THỐNG GIAO VIỆC & BẢNG KANBAN THEO DÕI TASK (IN-REPO TASK MANAGEMENT)
+
+Để tránh tình trạng quá tải thông tin và giúp từng thành viên tập trung tối đa vào phần việc chuyên trách của mình, toàn bộ nhiệm vụ của Sprint Tích hợp Hệ thống (12/11 – 20/11/2026) được quản trị trực tiếp tại thư mục **[`docs/tasks/`](docs/tasks/README.md)**:
+
+- 📊 **Bảng điều khiển Kanban tổng thể:** [`docs/tasks/README.md`](docs/tasks/README.md)
+- 📜 **Kế hoạch Sprint chi tiết toàn nhóm:** [`docs/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md`](docs/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md)
+
+### 📌 File Giao việc Cá nhân theo Từng Thành viên:
+Mỗi thành viên chỉ cần mở đúng tệp mang tên mình dưới đây để theo dõi các đầu việc chi tiết, câu lệnh kỹ thuật, tiêu chí nghiệm thu và tự tích dấu `[x]` khi hoàn thành:
+
+| Thành viên | Phân hệ phụ trách | Tệp giao việc cá nhân | Hạn chót Sprint |
+| :--- | :--- | :---: | :---: |
+| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`docs/tasks/TASK_DUC_SMART_CONTRACT.md`](docs/tasks/TASK_DUC_SMART_CONTRACT.md) | **16/11/2026** |
+| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`docs/tasks/TASK_PHI_AUCTION_ENGINE.md`](docs/tasks/TASK_PHI_AUCTION_ENGINE.md) | **20/11/2026** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`docs/tasks/TASK_THANG_FRONTEND_WEB3.md`](docs/tasks/TASK_THANG_FRONTEND_WEB3.md) | **20/11/2026** |
+| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`docs/tasks/TASK_HUY_LEAD_COORDINATION.md`](docs/tasks/TASK_HUY_LEAD_COORDINATION.md) | **20/11/2026** |
+
+### 🛠️ Quy trình 5 bước thực hiện task:
+1. **Mở file task cá nhân:** Đọc kỹ mô tả công việc, tiêu chí nghiệm thu và hạn chót.
+2. **Tạo nhánh làm việc:** `git checkout -b feat/<ten-ban>-<ten-task>` từ nhánh `main` mới nhất.
+3. **Thực hiện code & kiểm thử:** Đảm bảo toàn bộ unit test của phân hệ mình pass 100%.
+4. **Cập nhật tiến độ:** Đổi dấu `- [ ]` thành `- [x]` trong file task cá nhân và ghi chú ngắn gọn ở mục nhật ký cuối file.
+5. **Tạo Pull Request:** Đẩy nhánh lên GitHub và tạo PR vào `main` để Chủ nhiệm đề tài (Đặng Xuân Huy) review và merge.
 
 ---
 
