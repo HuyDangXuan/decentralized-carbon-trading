@@ -10,10 +10,10 @@
 
 | Hạng mục Phân hệ | Thành viên phụ trách | Trạng thái hiện tại | Sản phẩm bàn giao chính | Bản cập nhật mới nhất |
 | :--- | :--- | :---: | :--- | :---: |
-| **Kiến trúc & SRS (IEEE 830)** | **Đặng Xuân Huy** | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ** | `docs/SRS_DOCUMENT.md`<br/>`docs/ADR_001_...md` | 10/11/2026 |
-| **Thuật toán Đấu giá & API Engine** | **Nguyễn Bảo Phi** | 🟡 **ĐANG TRIỂN KHAI** | `session_engine.py`<br/>`api_service.py` (FastAPI) | 10/11/2026 |
-| **Hợp đồng Thông minh (Solidity v2)** | **Nguyễn Hoàng Đức** | 🟡 **ĐANG TRIỂN KHAI** | `contracts/CarbonDoubleAuction.sol`<br/>Test Hardhat đo Gas | 10/11/2026 |
-| **Web3 Frontend & DApp UI/UX** | **Ngô Văn Thắng** | 🟡 **ĐANG TRIỂN KHAI** | `docs/METADATA_SCHEMA.json`<br/>Figma Wireframe 4 Portal | 10/11/2026 |
+| **Kiến trúc & SRS (IEEE 830)** | **Đặng Xuân Huy** | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ** | `docs/SRS_DOCUMENT.md`<br/>`docs/ADR_001_...md` | 11/11/2026 |
+| **Hợp đồng Thông minh (Solidity v2)** | **Nguyễn Hoàng Đức** | 🟢 **HOÀN THÀNH CODE & TEST V2** | `contracts/CarbonDoubleAuction.sol`<br/>Hardhat Test Suite (450 lines) | 11/11/2026 |
+| **Thuật toán Đấu giá & API Engine** | **Nguyễn Bảo Phi** | 🟢 **HOÀN THÀNH LÕI & API V2** | `session_engine.py`<br/>`api_service.py` (FastAPI) | 11/11/2026 |
+| **Web3 Frontend & DApp UI/UX** | **Ngô Văn Thắng** | 🟡 **HOÀN THÀNH WEB3 & SCHEMA** | `docs/METADATA_SCHEMA.json`<br/>`TradingFloor.tsx`, EIP-712 hooks | 11/11/2026 |
 
 ---
 
@@ -23,6 +23,7 @@
 
 | Ngày ghi nhận | Tiêu đề tóm tắt nội dung | Thành viên thực hiện | Liên kết chi tiết |
 | :---: | :--- | :---: | :---: |
+| **11/11/2026** | **Hợp nhất toàn diện 3 phân hệ (Smart Contract v2, Matching Engine v2, Frontend Web3) vào main; giải quyết triệt để xung đột Git và kiểm thử tích hợp chéo thành công.** | Đặng Xuân Huy | [Xem chi tiết](2026-11-11/README.md) |
 | **10/11/2026** | **Khóa 4 thông số kiến trúc (ADR-001), ban hành hồ sơ SRS IEEE 830 hoàn chỉnh, đồng bộ kiến trúc v2.0 và hiệu chỉnh đề cương học thuật Nhiệm vụ 3.** | Đặng Xuân Huy | [Xem chi tiết](2026-11-10/README.md) |
 | *Ngày tiếp theo...* | *(Sẽ được cập nhật liên tục khi có phát sinh công việc mới)* | Đặng Xuân Huy | *Đang chờ* |
 
