@@ -1,0 +1,26 @@
+{
+  "name": "decentralized-carbon-trading",
+  "version": "1.0.0",
+  "description": "> **Đề tài Nghiên cứu Khoa học Sinh viên - ĐH Điện Lực (2026 - 2027)**  \r > **Chủ nhiệm đề tài:** Đặng Xuân Huy  \r > **Giảng viên hướng dẫn:** TS. Nguyễn Thị Hồng Khánh  \r > **Thành viên nghiên cứu:** Đặng Xuân Huy, Ngô Văn Thắng, Nguyễn Hoàng Đức, Nguyễn Bảo Phi  \r > **Khoa:** Điện toán và Công nghệ số năng lượng – Trường Đại học Điện Lực (EPU)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github-hoangduc:HuyDangXuan/decentralized-carbon-trading.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "hardhat": "^2.29.1"
+  }
+}
