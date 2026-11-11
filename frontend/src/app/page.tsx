@@ -11,16 +11,20 @@ import { useAccount } from "wagmi";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { CreditBalanceCard } from "@/components/CreditBalanceCard";
+import { TradingFloor } from "@/components/TradingFloor";
+import { parseTokenId } from "@/lib/orders";
 
 export default function HomePage() {
   const { isConnected } = useAccount();
   const [tokenIdInput, setTokenIdInput] = useState("101");
+  let validTokenId: bigint | undefined;
+  try { validTokenId = parseTokenId(tokenIdInput); } catch { /* Display validation below. */ }
 
   return (
     <div className="min-h-screen">
       {/* ── HEADER / NAVBAR ── */}
       <header className="sticky top-0 z-40 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
             <span className="text-2xl">🌱</span>
@@ -35,7 +39,7 @@ export default function HomePage() {
           </div>
 
           {/* Network + Wallet */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap max-w-full items-center gap-3">
             <NetworkBadge />
             <ConnectWalletButton />
           </div>
@@ -100,11 +104,10 @@ export default function HomePage() {
             </div>
 
             {/* Credit Balance Card */}
-            {tokenIdInput && (
-              <CreditBalanceCard tokenId={BigInt(tokenIdInput || "0")} />
-            )}
+            {validTokenId !== undefined ? <CreditBalanceCard tokenId={validTokenId} /> : <p role="alert" className="text-sm text-red-300">Token ID phải là số nguyên uint256.</p>}
           </div>
         )}
+        {validTokenId !== undefined && <TradingFloor tokenId={validTokenId.toString()} />}
       </main>
 
       {/* ── FOOTER ── */}

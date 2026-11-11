@@ -16,18 +16,15 @@ import {
   useWaitForTransactionReceipt,
   useWatchContractEvent,
 } from "wagmi";
-import { CARBON_CREDIT_1155_ABI, CONTRACT_ADDRESSES } from "../contracts";
+import { CARBON_CREDIT_1155_ABI, getContractAddresses, requireContractAddress } from "../contracts";
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
 
 /** Lấy địa chỉ contract theo chainId hiện tại */
-function getContractAddress(chainId?: number): `0x${string}` {
-  if (chainId === 80002) return CONTRACT_ADDRESSES.polygonAmoy.carbonCredit1155;
-  if (chainId === 11155111) return CONTRACT_ADDRESSES.sepolia.carbonCredit1155;
-  // Fallback: Polygon Amoy
-  return CONTRACT_ADDRESSES.polygonAmoy.carbonCredit1155;
+function getContractAddress(chainId?: number): `0x${string}` | undefined {
+  return getContractAddresses(chainId)?.carbonCredit1155;
 }
 
 // ─────────────────────────────────────────────
@@ -42,7 +39,7 @@ export function useCreditBalance(account?: `0x${string}`, tokenId?: bigint, chai
     functionName: "balanceOf",
     args: account && tokenId !== undefined ? [account, tokenId] : undefined,
     query: {
-      enabled: !!account && tokenId !== undefined,
+      enabled: !!getContractAddress(chainId) && !!account && tokenId !== undefined,
     },
   });
 }
@@ -55,7 +52,7 @@ export function useCreditURI(tokenId?: bigint, chainId?: number) {
     functionName: "uri",
     args: tokenId !== undefined ? [tokenId] : undefined,
     query: {
-      enabled: tokenId !== undefined,
+      enabled: !!getContractAddress(chainId) && tokenId !== undefined,
     },
   });
 }
@@ -68,7 +65,7 @@ export function useCreditTotalSupply(tokenId?: bigint, chainId?: number) {
     functionName: "totalSupply",
     args: tokenId !== undefined ? [tokenId] : undefined,
     query: {
-      enabled: tokenId !== undefined,
+      enabled: !!getContractAddress(chainId) && tokenId !== undefined,
     },
   });
 }
@@ -81,7 +78,7 @@ export function useCreditTotalRetired(tokenId?: bigint, chainId?: number) {
     functionName: "totalRetired",
     args: tokenId !== undefined ? [tokenId] : undefined,
     query: {
-      enabled: tokenId !== undefined,
+      enabled: !!getContractAddress(chainId) && tokenId !== undefined,
     },
   });
 }
@@ -98,7 +95,7 @@ export function useIsApprovedForAll(
     functionName: "isApprovedForAll",
     args: account && operator ? [account, operator] : undefined,
     query: {
-      enabled: !!account && !!operator,
+      enabled: !!getContractAddress(chainId) && !!account && !!operator,
     },
   });
 }
@@ -116,7 +113,7 @@ export function useMintCarbonCredit(chainId?: number) {
 
   const mint = (to: `0x${string}`, tokenId: bigint, amount: bigint, ipfsURI: string) => {
     writeContract({
-      address: getContractAddress(chainId),
+      address: requireContractAddress(chainId, "carbonCredit1155"),
       abi: CARBON_CREDIT_1155_ABI,
       functionName: "mintCarbonCredit",
       args: [to, tokenId, amount, ipfsURI],
@@ -135,7 +132,7 @@ export function useRetireCarbonCredit(chainId?: number) {
 
   const retire = (tokenId: bigint, amount: bigint, reason: string) => {
     writeContract({
-      address: getContractAddress(chainId),
+      address: requireContractAddress(chainId, "carbonCredit1155"),
       abi: CARBON_CREDIT_1155_ABI,
       functionName: "retireCarbonCredit",
       args: [tokenId, amount, reason],
@@ -159,7 +156,7 @@ export function useTransferCredit(chainId?: number) {
     amount: bigint
   ) => {
     writeContract({
-      address: getContractAddress(chainId),
+      address: requireContractAddress(chainId, "carbonCredit1155"),
       abi: CARBON_CREDIT_1155_ABI,
       functionName: "safeTransferFrom",
       args: [from, to, tokenId, amount, "0x"],
@@ -178,7 +175,7 @@ export function useSetApprovalForAll(chainId?: number) {
 
   const approve = (operator: `0x${string}`, approved: boolean) => {
     writeContract({
-      address: getContractAddress(chainId),
+      address: requireContractAddress(chainId, "carbonCredit1155"),
       abi: CARBON_CREDIT_1155_ABI,
       functionName: "setApprovalForAll",
       args: [operator, approved],
@@ -203,6 +200,7 @@ export function useWatchCarbonRetiredEvents(
   chainId?: number
 ) {
   useWatchContractEvent({
+    enabled: !!getContractAddress(chainId),
     address: getContractAddress(chainId),
     abi: CARBON_CREDIT_1155_ABI,
     eventName: "CarbonRetired",

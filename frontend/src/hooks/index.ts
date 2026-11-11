@@ -14,6 +14,7 @@ export {
 export {
   useEIP712Order,
   OrderType,
+  TimeInForce,
   usdToMicroUsdc,
   microUsdcToUsd,
 } from "./useEIP712Order";

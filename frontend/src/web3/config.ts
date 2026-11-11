@@ -7,15 +7,15 @@
  * - Transport: HTTP public RPC (đổi sang Alchemy/Infura khi production).
  */
 
-import { http, createConfig } from "wagmi";
+import { http, createConfig, injected } from "wagmi";
 import { polygonAmoy, sepolia } from "wagmi/chains";
-import { injected } from "wagmi/connectors";
 
 /**
  * Cấu hình Wagmi chính.
  * `injected()` tự phát hiện MetaMask, Rabby, Coinbase Wallet… trong trình duyệt.
  */
 export const wagmiConfig = createConfig({
+  ssr: true,
   chains: [polygonAmoy, sepolia],
   connectors: [
     injected({

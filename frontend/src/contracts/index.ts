@@ -1,27 +1,27 @@
-/**
- * contracts/index.ts
- * Barrel export: địa chỉ contract đã deploy + ABIs.
- *
- * ⚠️  Sau khi deploy lên testnet (Polygon Amoy / Ethereum Sepolia),
- *     thay các giá trị CONTRACT_ADDRESSES bằng địa chỉ thực.
- */
-
+import { isAddress, zeroAddress, type Address } from "viem";
 export { CARBON_CREDIT_1155_ABI } from "./CarbonCredit1155ABI";
-export { CARBON_DOUBLE_AUCTION_ABI } from "./CarbonDoubleAuctionABI";
+export { CARBON_DOUBLE_AUCTION_ABI, AUCTION_ABI_READY, AUCTION_NONCE_FUNCTION } from "./CarbonDoubleAuctionABI";
 
-/**
- * Địa chỉ contract đã deploy.
- * Mặc định là placeholder – thay bằng giá trị thực sau khi deploy.
- */
+function configuredAddress(value?: string): Address | undefined {
+  return value && isAddress(value) && value.toLowerCase() !== zeroAddress ? value as Address : undefined;
+}
 export const CONTRACT_ADDRESSES = {
-  /** Polygon Amoy Testnet (chainId 80002) */
   polygonAmoy: {
-    carbonCredit1155: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-    carbonDoubleAuction: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_AMOY_CARBON_CREDIT_ADDRESS),
+    carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_AMOY_AUCTION_ADDRESS),
   },
-  /** Ethereum Sepolia Testnet (chainId 11155111) */
   sepolia: {
-    carbonCredit1155: "0x0000000000000000000000000000000000000000" as `0x${string}`,
-    carbonDoubleAuction: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_CARBON_CREDIT_ADDRESS),
+    carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_AUCTION_ADDRESS),
   },
 } as const;
+export function getContractAddresses(chainId?: number) {
+  if (chainId === 80002) return CONTRACT_ADDRESSES.polygonAmoy;
+  if (chainId === 11155111) return CONTRACT_ADDRESSES.sepolia;
+  return undefined;
+}
+export function requireContractAddress(chainId: number | undefined, key: "carbonCredit1155" | "carbonDoubleAuction"): Address {
+  const address = getContractAddresses(chainId)?.[key];
+  if (!address) throw new Error("Chưa cấu hình hợp đồng cho mạng đang kết nối.");
+  return address;
+}

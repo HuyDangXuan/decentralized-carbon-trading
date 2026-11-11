@@ -8,6 +8,7 @@
 
 import React from "react";
 import { useAccount } from "wagmi";
+import { getContractAddresses } from "../contracts";
 import {
   useCreditBalance,
   useCreditURI,
@@ -22,7 +23,7 @@ interface CreditBalanceCardProps {
 export function CreditBalanceCard({ tokenId }: CreditBalanceCardProps) {
   const { address, chain } = useAccount();
 
-  const { data: balance, isLoading: loadingBalance } = useCreditBalance(address, tokenId, chain?.id);
+  const { data: balance, isLoading: loadingBalance, error: balanceError } = useCreditBalance(address, tokenId, chain?.id);
   const { data: metadataURI } = useCreditURI(tokenId, chain?.id);
   const { data: totalSupply } = useCreditTotalSupply(tokenId, chain?.id);
   const { data: totalRetired } = useCreditTotalRetired(tokenId, chain?.id);
@@ -31,6 +32,10 @@ export function CreditBalanceCard({ tokenId }: CreditBalanceCardProps) {
     totalSupply !== undefined && totalRetired !== undefined
       ? totalSupply - totalRetired
       : undefined;
+
+  if (!getContractAddresses(chain?.id)?.carbonCredit1155) {
+    return <p role="status" className="text-sm text-gray-400">Chưa cấu hình hợp đồng tín chỉ trên mạng này.</p>;
+  }
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-2xl p-5 max-w-sm">
@@ -45,10 +50,10 @@ export function CreditBalanceCard({ tokenId }: CreditBalanceCardProps) {
       {/* Số dư */}
       <div className="mb-4">
         <p className="text-3xl font-bold text-white">
-          {loadingBalance ? (
+          {balanceError ? <span className="text-sm text-red-300">Không đọc được số dư</span> : loadingBalance ? (
             <span className="animate-pulse text-gray-500">---</span>
           ) : (
-            (balance ?? 0n).toString()
+            balance !== undefined ? balance.toString() : "—"
           )}
         </p>
         <p className="text-xs text-gray-500 mt-1">tCO2e sở hữu</p>
