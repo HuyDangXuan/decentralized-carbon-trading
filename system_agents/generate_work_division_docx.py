@@ -166,7 +166,7 @@ def create_work_division_docx(output_path):
         ["4", "Thiết kế kỹ thuật Smart Contract ERC-1155 (Storage, Buffer Pool, Custom Errors)", "Nguyễn Hoàng Đức", "Ngô Văn Thắng", "docs/SMART_CONTRACT_SPEC.md (Phần ERC-1155)", "25/11/2026"],
         ["5", "Thiết kế hợp đồng Đấu giá CarbonDoubleAuction & Cơ chế ký ngoài chuỗi EIP-712", "Nguyễn Hoàng Đức", "Nguyễn Bảo Phi", "docs/SMART_CONTRACT_SPEC.md (Phần Auction)", "05/12/2026"],
         ["6", "Thiết kế logic Matching Engine (Tie-breaking, Rollover) & Đặc tả API Service", "Nguyễn Bảo Phi", "Đặng Xuân Huy", "Tệp docs/MATCHING_ENGINE_SPEC.md", "25/11/2026"],
-        ["7", "Viết script mô phỏng thực nghiệm toán học (100 - 500 lệnh) đo thặng dư xã hội", "Nguyễn Bảo Phi", "Nguyễn Hoàng Đức", "Script Python mô phỏng & Đồ thị thực nghiệm", "10/12/2026"],
+        ["7", "Viết script mô phỏng thực nghiệm: phân bổ thặng dư (Surplus Split) & tổn thất hiệu quả (Deadweight Loss)", "Nguyễn Bảo Phi", "Nguyễn Hoàng Đức", "Script Python mô phỏng & Đồ thị thực nghiệm", "10/12/2026"],
         ["8", "Tổng hợp toàn bộ Hồ sơ Thiết kế Giai đoạn 2, rà soát mã nguồn & Báo cáo GVHD", "Đặng Xuân Huy", "Cả nhóm", "Báo cáo tiến độ GĐ 2 hoàn chỉnh & Slide báo cáo", "30/12/2026"]
     ]
 
@@ -250,7 +250,9 @@ def create_work_division_docx(output_path):
             ("Vai trò:", " Kỹ sư Thuật toán Đấu giá, Thiết kế Matching Engine và Thực nghiệm Kinh tế lượng."),
             ("Nhiệm vụ 1 (Thiết kế logic Matching Engine chi tiết):", " Xây dựng quy tắc phá hòa (Tie-breaking rules) khi có nhiều lệnh cùng mức giá (ưu tiên theo thời gian FIFO hoặc chia theo tỷ lệ Pro-rata). Thiết kế cơ chế chuyển tiếp lệnh chưa khớp (Order Rollover: GTC hoặc IOC) giữa các phiên đấu giá theo nghiên cứu Liu et al. (2026)."),
             ("Nhiệm vụ 2 (Thiết kế API Service cho Bộ khớp lệnh):", " Đặc tả giao diện kết nối API (RESTful/WebSocket) giữa Matching Agent (Python) với Frontend DApp và Smart Contract."),
-            ("Nhiệm vụ 3 (Mô phỏng thực nghiệm toán học):", " Viết kịch bản Python sinh 100 - 500 lệnh giao dịch ngẫu nhiên, đối chiếu thặng dư xã hội (Social Welfare) và độ lệch giá (spread) giữa các trường hợp hệ số k khác nhau (alpha = 0, alpha = 0.5, alpha = 1) để tìm ra tham số tối ưu."),
+            ("Nhiệm vụ 3 (Mô phỏng thực nghiệm toán học & Kinh tế lượng vi mô):", " Triển khai mô phỏng thực nghiệm theo 2 nội dung khoa học chuẩn tắc:\n"
+             "  • Đánh giá sự phân bổ thặng dư kinh tế (Surplus Split) giữa bên mua và bên bán theo tham số k (buyer_share = 1 - k) trong điều kiện người tham gia khai giá trung thực.\n"
+             "  • Mô phỏng và đo lường tổn thất hiệu quả kinh tế (Efficiency Loss / Deadweight Loss) khi các bên tham gia sử dụng chiến lược khai giá không trung thực (chiến lược Bayesian-Nash Equilibrium) trên các quy mô thị trường m khác nhau (m = 2, 4, 8, 16, 32...); kiểm chứng tốc độ hội tụ O(1/m^2) của quy tắc giá kda theo lý thuyết Rustichini et al. (1994)."),
             ("Sản phẩm bàn giao:", " Tài liệu `docs/MATCHING_ENGINE_SPEC.md` + Thư mục script mô phỏng thực nghiệm."),
             ("AI Sub-Agent trợ lực:", " `auction-algorithm-specialist` (hỗ trợ mô hình hóa kinh tế học vi mô và tối ưu thuật toán).")
         ])
