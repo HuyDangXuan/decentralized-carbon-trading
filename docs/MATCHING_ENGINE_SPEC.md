@@ -4,7 +4,26 @@
 **Giai đoạn:** Giai đoạn 2 — Phân tích Yêu cầu và Thiết kế Chi tiết Hệ thống (11/2026 – 01/2027)
 **Người phụ trách:** Nguyễn Bảo Phi (Auction Algorithm Engineer)
 **Phối hợp:** Đặng Xuân Huy (SRS/UML), Nguyễn Hoàng Đức (CarbonDoubleAuction.sol/EIP-712)
-**Trạng thái:** Bản thiết kế (design spec) — chưa triển khai đầy đủ, chưa có kết quả thực nghiệm. Phần nào đã có code tham chiếu tới `system_agents/matching_engine/`; phần còn lại là đề xuất cần nhóm/GVHD chốt trước khi code hóa ở Giai đoạn 3.
+**Trạng thái:** Bản thiết kế (design spec), cập nhật 10/11/2026 — đã cài bản mock theo ADR-001 (xem mục "Cập nhật theo ADR-001" bên dưới), chưa nối blockchain. Đã có bộ mô phỏng và kết quả thực nghiệm sơ bộ trong `system_agents/matching_engine/simulation/` (mục 9.5, kèm giới hạn cách đọc); phần còn lại là đề xuất cần nhóm/GVHD chốt trước khi code hóa ở Giai đoạn 3.
+
+---
+
+## Cập nhật theo ADR-001 (10/11/2026)
+
+`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md` (Chủ nhiệm ban hành) khóa 4 thông số kiến trúc và README quy định đơn vị dữ liệu. Code `system_agents/matching_engine/auction_agent.py` (lớp bọc `session_engine.py`) và `api_service.py` đã làm theo. Bảng dưới ghi cách ADR chồng lên các mục còn lại của spec; **khi hai bên khác nhau, ADR là bản đang áp dụng** và phần khác biệt được liệt kê để nhóm xem lại.
+
+| Thông số | ADR-001 | Trong code | Khác với phần còn lại của spec |
+|---|---|---|---|
+| Chu kỳ phiên | 5 phút (gom lệnh 4 phút 30 giây, khớp 15 giây, settlement 15 giây) hoặc 15 phút | Chưa có đồng hồ; `POST /api/v1/sessions/run` kích hoạt phiên | Mốc 15 giây cho settlement chưa kiểm bằng đo gas/thời gian thực (Đ12 chưa benchmark) |
+| Phá hòa | `age_prorata` + Hamilton; phần dư bằng nhau thì FIFO | Đã cài; `seq` do engine gán khi nhận lệnh | §5.2 từng ghi "remaining lớn hơn, rồi `order_id`": đã đổi sang FIFO (tốt hơn vì `order_id` do người dùng tạo). Tách lệnh và nghịch lý Alabama (§5.2) vẫn còn |
+| Quy tắc giá | `P* = floor((b_M + s_M)/2)`, k = 1/2, gọi là "kda" | Quy tắc `marginal` của engine (hằng `PRICING_RULE`) | **Công thức ADR là `marginal` của §7, không phải `kda` của §7.** Khác nhau khi có lệnh kế tiếp chưa khớp: BID 10, ASK 1, ASK 2 (mỗi lệnh 1 đơn vị, k = 1/2) cho 5,5 theo ADR nhưng 1,5 theo `kda`, và ASK 2 vẫn bán được ở 5,5 mà không được khớp. Thí nghiệm C (sơ bộ) ở k = 0,5 không cho thấy `pair` chậm hơn (độ dốc ≈ −2,1 cho cả hai), nên lý do "`pair` chỉ O(1/m)" trong ADR chỉ đúng ở k = 1 |
+| Rollover | `MAX_ROLLOVER_SESSIONS = 3`; `rollover_count ≥ 3` thì `EXPIRED`; IOC dư thì `CANCELLED` | `end_session(max_rollover=2)`: lệnh GTC sống tối đa 3 phiên | §6 ghi "sống `max_rollover + 1` phiên": với ADR phải dùng `max_rollover = 2` |
+| Đơn vị | `amount` nguyên tCO2e; giá micro-USDC mỗi tCO2e (tick = 1) | Số thực bị từ chối; giá nguyên | Giải quyết Đ1 và Đ3 ở phía nhóm; làm tròn `floor` (Đ4) nằm trong [ask, bid] |
+
+Khác biệt khác so với các mục sau:
+- **API:** §8.2 dùng đường dẫn `/v1/...`; SRS FR-15 dùng `/api/v1/...` và bản mock theo SRS. Hủy lệnh trả `CANCELLED` (SRS FR-10) thay vì `CANCEL_REQUESTED`, kèm `onchain_valid_until` vì chữ ký gốc vẫn dùng được on-chain đến hạn. Định dạng chữ ký `CancelRequest` vẫn chưa được chốt với Đức.
+- **Vòng đời:** bản mock chưa có `PENDING_SETTLEMENT` (§4, §6.1): coi như settlement luôn thành công ngay sau khi khớp. Khớp giữa hai lệnh cùng `trader` bị bỏ để hợp đồng không revert (`SelfTradingNotAllowed`); biện pháp này không chống được hai ví của cùng một người.
+- **Hạn:** README và nhật ký 10/11 ghi 25/11; ADR ghi 20/11.
 
 ---
 
@@ -38,8 +57,8 @@ graph LR
 
 Mã nguồn liên quan:
 - [`order_book.py`](../system_agents/matching_engine/order_book.py) — `Order`, `MatchResult`.
-- [`auction_agent.py`](../system_agents/matching_engine/auction_agent.py) — `DoubleAuctionAgent`: sắp bid giảm dần/ask tăng dần, ghép hai con trỏ khi `bid >= ask`, giá khớp từng cặp `p = k·bid + (1−k)·ask`.
-- [`CarbonDoubleAuction.sol`](../contracts/CarbonDoubleAuction.sol) — `settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)`, chống replay qua `executedTrades[tradeHash]`.
+- [`auction_agent.py`](../system_agents/matching_engine/auction_agent.py) — `DoubleAuctionAgent`: sắp bid giảm dần/ask tăng dần, ghép hai con trỏ khi `bid >= ask`, giá khớp từng cặp `p = k·bid + (1−k)·ask` (đây là hành vi baseline hiện tại; spec đề xuất quy tắc khác, xem §7).
+- [`CarbonDoubleAuction.sol`](../contracts/CarbonDoubleAuction.sol) — **bản đang trên `main` (cũ):** `settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)`, chống replay qua `executedTrades[tradeHash]`, chỉ chuyển token carbon. Thiết kế mới của Đức [D] đổi hàm thành `settleMatchedTrade(MatchedTrade)`, chống replay bằng `filledAmount` và `nonce`, kèm thanh toán ERC-20; spec này bám theo [D] từ §3 trở đi.
 
 **Hiện trạng cần lưu ý của baseline (đã kiểm tra bằng cách chạy code):**
 - `run_periodic_double_auction()` **trừ trực tiếp vào `Order.amount`** của đối tượng đầu vào (một phiên 50 lệnh: tổng amount 1260 → 662). Mô phỏng phải `deepcopy` lệnh trước mỗi lần chạy; bản triển khai chính thức nên dùng `remaining_amount` riêng.
@@ -54,25 +73,35 @@ Mã nguồn liên quan:
 
 `Order(order_id, trader_id, order_type, token_id, amount, price, timestamp, signature)` và `MatchResult(bid_order_id, ask_order_id, token_id, amount, clearing_price, timestamp)`.
 
-### 3.2. Trường đề xuất bổ sung (chưa có trong code, cần nhóm xác nhận)
+### 3.2. Ánh xạ sang `Order` của hợp đồng và trường nội bộ của engine
 
-| Trường | Kiểu | Mục đích |
+Spec hợp đồng của Đức [D] (`docs/SMART_CONTRACT_SPEC.md`, §3.2 và §3.4) quy định struct `Order` được ký EIP-712. Engine phải nhận và chuyển tiếp **đúng struct đó**; các trường chỉ có ở engine không được ký.
+
+| Trường engine | Nguồn / ánh xạ | Ghi chú |
 |---|---|---|
-| `trader_address` | `str` (ví 0x…) | Địa chỉ ví dùng cho `buyer`/`seller` của `settleMatchedTrade`; tách khỏi `trader_id` nghiệp vụ. |
-| `status` | `NEW \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
-| `time_in_force` | `GTC \| IOC` | Rollover hay hủy phần dư (§6). |
-| `expiry` | `float` (epoch) | Hạn hiệu lực do người dùng đặt. |
-| `remaining_amount` | `int` | Khối lượng chưa khớp; giữ `amount` gốc bất biến. |
-| `first_session_id` / `sessions_alive` | `str` / `int` | Số phiên lệnh đã tồn tại, dùng cho ưu tiên theo tuổi (§5). |
+| `order_id` (code hiện tại: `str`) | `Order.orderId` (`bytes32`) | Đổi sang `bytes32` (hex 0x…) khi code hóa GĐ3. |
+| `trader_address` | `Order.trader` (`address`) | `trader_id` nghiệp vụ chỉ còn là nhãn nội bộ. |
+| `order_type` | `Order.orderType` (`uint8`: 0 = BID, 1 = ASK) | Khớp `OrderType` hiện có. |
+| `token_id` | `Order.tokenId` | |
+| `amount` | `Order.amount` (`uint128`) | **Chưa thống nhất đơn vị**, xem §3.3. |
+| `price` | `Order.pricePerUnit` (`uint128`, wei của token thanh toán) | Số nguyên, không dùng `float` (§3.3). |
+| `nonce` | `Order.nonce` | Chống phát lại; xem §8.1 về `incrementNonce`. |
+| `deadline` | `Order.deadline` (epoch giây) | Thay trường `expiry` đề xuất trước đây. |
+| `signature` | `bidSignature` / `askSignature` của `MatchedTrade` | |
+| `status` | chỉ engine: `NEW \| PENDING_SETTLEMENT \| PARTIALLY_FILLED \| FILLED \| CANCELLED \| EXPIRED \| ROLLED_OVER` | Vòng đời lệnh qua nhiều phiên. |
+| `time_in_force` | chỉ engine: `GTC \| IOC` | **Không nằm trong struct được ký**; xem §6.1. |
+| `remaining_amount` | chỉ engine, **suy ra từ `amount − filledAmount[orderId]` on-chain − `in_flight`** (khối lượng đã gửi settlement mà chưa có `TradeSettled` hoặc revert) | Hợp đồng là nguồn sự thật về khối lượng đã khớp [D, §3.3, bước 3]; engine đồng bộ đầu mỗi phiên, giữ `amount` gốc bất biến. |
+| `first_session_id` / `sessions_alive` | chỉ engine | Ưu tiên theo tuổi (§5.2). |
 
-`MatchResult` bổ sung `session_id` và `trade_hash`.
+`MatchResult` bổ sung `session_id` và ánh xạ sang `MatchedTrade` của [D]: `{bidOrder, askOrder, bidSignature, askSignature, matchAmount, clearingPrice}`.
 
-**Cách tính `trade_hash`:** `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`. Dùng `abi.encode` (không dùng `encodePacked`) để tránh va chạm giữa các chuỗi có độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` và khuyến nghị ưu tiên `abi.encode` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên khi partial fill.
+**`trade_hash`:** `MatchedTrade` trong [D] **không có** trường `tradeHash`; sự kiện `TradeSettled` mang `tradeHash` (indexed) nhưng [D] **không nêu công thức** tính; chống phát lại dựa vào `filledAmount` theo từng lệnh, nên [D] không chặn gửi trùng cùng một `MatchedTrade` khi lệnh còn khối lượng, và từ `filledAmount` không phân biệt được "đúng khớp này đã settle" với "một khớp khác đã settle" (Đ15). Vì vậy `trade_hash` ở phía engine chỉ là **khóa idempotency nội bộ** (tránh gửi hai lần cùng một khớp khi retry), không gửi on-chain. Công thức đề xuất: `keccak256(abi.encode(session_id, bid_order_id, ask_order_id, fill_index))`; dùng `abi.encode` thay `encodePacked` để tránh va chạm giữa các giá trị độ dài biến thiên (tài liệu Solidity cảnh báo `encodePacked("a","bc") == encodePacked("ab","c")` [S1]); `fill_index` cần có vì một cặp lệnh có thể khớp nhiều lần qua các phiên.
 
 ### 3.3. Đơn vị, tick giá và giả định
 
-- `amount`: số nguyên tCO2e (1 token = 1 tCO2e, khớp `CarbonCredit1155.sol`).
-- **Tick giá:** để bảo đảm `ask ≤ p ≤ bid`, giá tính bằng số nguyên theo đơn vị nhỏ nhất (ví dụ cent hoặc đơn vị stablecoin test), không dùng `float`. Quy tắc làm tròn của giá khớp (về phía có lợi cho bên nào) là **quyết định cần chốt**; tối thiểu phải đảm bảo kết quả không rời khoảng [ask, bid]. Đây cũng là biểu diễn cần để khớp với `uint256 pricePerUnit` on-chain.
+- `amount`: số nguyên (`uint128` on-chain). **Đơn vị đang mâu thuẫn giữa các tài liệu:** [D] §3.2 ghi `kg CO2e`; báo cáo Giai đoạn 1 và các phiên bản trước của spec này ghi 1 token = 1 tCO2e; `CarbonCredit1155.sol` trên `main` không nêu đơn vị. Engine không phụ thuộc đơn vị (chỉ cộng/trừ số nguyên) nhưng phải chốt một đơn vị duy nhất với Đức trước khi code hóa, vì nó đổi cả `max_amount` trong mô phỏng lẫn cách quy đổi tổng thanh toán `matchAmount × clearingPrice`.
+- **Tick giá:** hợp đồng kiểm `askOrder.pricePerUnit ≤ clearingPrice ≤ bidOrder.pricePerUnit` và revert `PriceMismatch` nếu vi phạm [D, §3.3, bước 2], nên điều kiện này là **ràng buộc cứng**, không chỉ là bất biến kiểm thử. Giá tính bằng số nguyên theo đơn vị nhỏ nhất của token thanh toán, không dùng `float`. Công thức `k·bid + (1−k)·ask` với số nguyên phải làm tròn sao cho kết quả luôn nằm trong [ask, bid] (ví dụ làm tròn xuống rồi kẹp vào [ask, bid]); hướng làm tròn là quyết định cần chốt (đề xuất ở đoạn kế tiếp). Baseline hiện tại `round(…, 2)` không bảo đảm điều này (ask=10.001, bid=10.004, k=0 → 10.0).
+- **Hướng làm tròn (đề xuất, chờ chốt với Đức):** tính bằng số nguyên `n = k_num·bid + (k_den−k_num)·ask`, `q, r = divmod(n, k_den)`. Khi `ask`, `bid` là số nguyên (tick), mọi cách làm tròn về `q` hoặc `q+1` đều nằm trong `[ask, bid]` vì `n/k_den` nằm giữa hai số nguyên đó; `k` phải là phân số hữu tỉ cố định `k_num/k_den`. Về thiên lệch: `floor` không bao giờ có lợi bên bán và có lợi bên mua mỗi khi phần lẻ khác 0, `ceil` thì ngược lại; `half_up` chỉ chệch ở đúng điểm giữa (phần lẻ đúng 0,5, xảy ra khi `k_den` chẵn, ví dụ k = 1/2 với `bid + ask` lẻ, hoặc k = 1/4 với bid = 5, ask = 3) và khi đó luôn đẩy giá lên; `half_even` (làm tròn về số chẵn khi đúng 0,5) triệt tiêu thiên lệch đó theo kỳ vọng nếu chẵn lẻ của `q` phân bố đều (chưa phân tích khả năng người chơi nhắm chẵn lẻ) và vẫn tất định. Đề xuất mặc định `half_even`; đây là lập luận số học, đã được tham vấn Argon cho cùng kết luận, không phải quy chuẩn của một sàn cụ thể.
 - `token_id` đại diện một lớp tín chỉ đủ điều kiện thay thế (project + vintage); engine chỉ khớp lệnh cùng `token_id` và **không** tự đánh giá tính đồng nhất.
 
 ---
@@ -82,27 +111,30 @@ Mã nguồn liên quan:
 ```mermaid
 stateDiagram-v2
     [*] --> NEW: submit_order()
-    NEW --> PARTIALLY_FILLED: khớp một phần
-    NEW --> FILLED: khớp toàn bộ
-    PARTIALLY_FILLED --> FILLED: khớp hết phần còn lại
-    NEW --> ROLLED_OVER: hết phiên, GTC, chưa khớp
-    PARTIALLY_FILLED --> ROLLED_OVER: hết phiên, GTC, còn dư
-    ROLLED_OVER --> PARTIALLY_FILLED: khớp một phần ở phiên sau
-    ROLLED_OVER --> FILLED: khớp hết ở phiên sau
+    NEW --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    PARTIALLY_FILLED --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    ROLLED_OVER --> PENDING_SETTLEMENT: khớp ở cutoff, đã gửi settlement
+    PENDING_SETTLEMENT --> PARTIALLY_FILLED: TradeSettled, còn dư
+    PENDING_SETTLEMENT --> FILLED: TradeSettled, hết khối lượng
+    PENDING_SETTLEMENT --> ROLLED_OVER: settlement revert, GTC còn hạn (quay lại sổ)
+    PENDING_SETTLEMENT --> CANCELLED: settlement revert vì lệnh bị hủy hoặc vô hiệu on-chain
+    NEW --> ROLLED_OVER: hết phiên, GTC, chưa khớp, còn hạn
+    PARTIALLY_FILLED --> ROLLED_OVER: hết phiên, GTC, còn dư, còn hạn
+    ROLLED_OVER --> ROLLED_OVER: phiên sau vẫn chưa khớp, còn hạn và trong giới hạn rollover
     NEW --> CANCELLED: hết phiên, IOC, không khớp
     PARTIALLY_FILLED --> CANCELLED: hết phiên, IOC, còn dư
     NEW --> CANCELLED: người dùng hủy trước cutoff
     PARTIALLY_FILLED --> CANCELLED: người dùng hủy trước cutoff
-    ROLLED_OVER --> CANCELLED: người dùng hủy trước cutoff
-    NEW --> EXPIRED: quá expiry
-    PARTIALLY_FILLED --> EXPIRED: quá expiry
-    ROLLED_OVER --> EXPIRED: quá expiry hoặc vượt giới hạn rollover
+    ROLLED_OVER --> CANCELLED: người dùng hủy trước cutoff, hoặc cancelOrder/incrementNonce on-chain
+    NEW --> EXPIRED: quá deadline
+    PARTIALLY_FILLED --> EXPIRED: quá deadline
+    ROLLED_OVER --> EXPIRED: quá deadline hoặc vượt giới hạn rollover
     FILLED --> [*]
     CANCELLED --> [*]
     EXPIRED --> [*]
 ```
 
-`ROLLED_OVER` là trạng thái ổn định giữa hai phiên và được đưa vào snapshot của phiên sau như lệnh còn hiệu lực.
+`ROLLED_OVER` là trạng thái ổn định giữa hai phiên và được đưa vào snapshot của phiên sau như lệnh còn hiệu lực. `FILLED` và `PARTIALLY_FILLED` chỉ được đặt **sau khi có `TradeSettled` on-chain**, không phải ngay khi khớp off-chain; trong lúc chờ, lệnh ở `PENDING_SETTLEMENT` và khối lượng đã gửi được trừ khỏi `remaining_amount` (`in_flight`, §3.2), để phiên sau không phân bổ lại cùng khối lượng đó. Lệnh bị vô hiệu on-chain phát hiện qua event (`OrderCancelled`, `UserNonceIncremented`) hoặc khi settlement revert.
 
 ---
 
@@ -123,15 +155,19 @@ Bài Budish, Cramton & Shim (2015) [R3, mục VII.A] mô tả batch auction rờ
 3. **Cùng giá, cùng tuổi → pro-rata** theo khối lượng còn lại:
    ```
    alloc(o) = floor(available * o.remaining / sum_remaining_cùng_nhóm)
-   phần dư do làm tròn xuống: chia lần lượt theo thứ tự (order_id tăng dần)
+   phần dư sau floor (nhỏ hơn số lệnh trong nhóm): largest remainder (Hamilton) — mỗi lệnh có phần dư
+   thập phân (available * o.remaining mod sum_remaining) / sum_remaining; cộng 1 đơn vị cho các lệnh theo phần dư
+   giảm dần, hòa thì ưu tiên lệnh có remaining lớn hơn, hòa nữa thì order_id tăng dần
    ```
-   Thứ tự `order_id` là quy tắc tất định, công bố trước, để cùng snapshot luôn cho cùng kết quả.
+   Quy tắc công bố trước và tất định để cùng snapshot luôn cho cùng kết quả. **Không** chia phần dư theo `order_id` tăng dần: quy tắc đó thiên lệch có hệ thống cho `order_id` nhỏ và bị khai thác bằng cách chọn `order_id` hoặc tách một lệnh thành nhiều lệnh nhỏ để nhận nhiều đơn vị dư hơn. Largest remainder bỏ được thiên lệch theo `order_id`, nhưng **chưa được chứng minh** là chống tách lệnh (chưa phân tích mức lợi tối đa của việc tách; cần kiểm bằng mô phỏng ở bước code hóa).
+
+   **Giới hạn đã biết của largest remainder và chống thao túng** (đã kiểm bằng `session_engine.py`): (a) tách lệnh vẫn có lợi: nhóm {A = 2, B = 1, C = 1} với 2 đơn vị khả dụng, A nhận 1 đơn vị; nếu A tách thành hai lệnh khối lượng 1 có `order_id` nhỏ hơn B và C thì tổng A nhận 2; (b) nghịch lý Alabama: nhóm khối lượng (1, 3, 3) được chia (1, 1, 1) khi khả dụng 3 nhưng (0, 2, 2) khi khả dụng 4, tức lệnh nhỏ mất phần khi bên đối ứng tăng khối lượng. Các phương pháp chia theo ước số (Jefferson, Webster/Sainte-Laguë) không bị nghịch lý Alabama nhưng không bảo đảm quota; phá hòa ngẫu nhiên có seed công bố trước (hướng của [R3]) loại bỏ ưu thế theo `order_id`. **Chưa chọn**, cần chốt khi code hóa. Gộp lệnh theo tài khoản không có tác dụng trên chuỗi vì tạo địa chỉ ví không tốn chi phí (Sybil), nên giới hạn số lệnh mở trên mỗi địa chỉ cũng không đủ một mình. Chi phí thật chỉ đến từ khối lượng đặt lệnh tối thiểu có ý nghĩa kinh tế và, nếu nhóm muốn, khóa tài sản khi đặt lệnh (cần đổi mô hình non-custodial ở §8.1 và [D]); với thiết kế hiện tại không có khóa nên giữ lệnh GTC để lấy tuổi gần như không tốn gì. **Ưu tiên theo tuổi:** mọi sửa giá hoặc tăng khối lượng là hủy lệnh cũ và gửi lệnh mới với tuổi 0 (tự nhiên với lệnh ký EIP-712 bất biến), để không thể nuôi tuổi bằng lệnh giá xa rồi sửa giá; biên độ giá đặt lệnh quanh giá tham chiếu hạn chế lệnh giữ chỗ nhưng không loại bỏ.
 
 **Phương án thay thế — FIFO theo timestamp trong phiên** (hành vi baseline hiện tại): đơn giản, tất định, nhưng thưởng cho lệnh đến sớm trong cùng phiên và dễ gây cuộc đua tốc độ — chính vấn đề batch auction nhằm loại bỏ. Giữ làm tùy chọn cấu hình `tie_break_mode: "age_prorata" | "fifo"`.
 
 **Mức độ chứng cứ:** ngoài [R3], một đề xuất cộng đồng cho batch auction đa tài sản cũng nêu quy tắc tương tự (ưu tiên lệnh từ batch cũ hơn, pro-rata chỉ ở batch phải chia phần) [S3]. Đó là đề xuất, không phải tiêu chuẩn. Chưa tìm được tài liệu công khai nào mô tả quy tắc chia phần ở giá hòa của CoW Protocol, nên spec không dựa vào CoW cho điểm này.
 
-**Trạng thái triển khai:** `age_prorata` chưa được code; baseline chỉ có FIFO. Việc code hóa và so sánh hai chế độ thuộc Giai đoạn 3.
+**Trạng thái triển khai:** đã có engine tham chiếu số nguyên `system_agents/matching_engine/session_engine.py` (`match_session`, `end_session`): ưu tiên giá → tuổi → pro-rata Hamilton (hoặc FIFO), ba quy tắc giá, bốn cách làm tròn, rollover GTC/IOC; có test và đã đối chiếu với baseline về khối lượng khớp và welfare. **Chưa tích hợp** vào `auction_agent.py`; API Service và so sánh `fifo` với `age_prorata` bằng mô phỏng thuộc Giai đoạn 3.
 
 ### 5.3. Bất biến cần kiểm tra
 
@@ -145,7 +181,7 @@ Bài Budish, Cramton & Shim (2015) [R3, mục VII.A] mô tả batch auction rờ
 
 | TIF | Hành vi khi hết phiên còn dư |
 |---|---|
-| **GTC** | `status = ROLLED_OVER`, giữ `price` và `order_id`, tăng `sessions_alive`; được ưu tiên theo tuổi ở phiên sau (§5.2). |
+| **GTC** | `status = ROLLED_OVER`, giữ `price` và `order_id`, tăng `sessions_alive`; được ưu tiên theo tuổi ở phiên sau (§5.2). Chỉ khi chưa vượt giới hạn rollover **và** `deadline ≥ next_cutoff + biên_an_toàn`; nếu không thì `EXPIRED`. |
 | **IOC** | Phần dư chuyển `CANCELLED` ngay khi phiên kết thúc. |
 
 ```mermaid
@@ -158,16 +194,25 @@ sequenceDiagram
     E->>OB: snapshot(NEW, PARTIALLY_FILLED, ROLLED_OVER; chưa hết hạn)
     E->>E: run_periodic_double_auction()
     loop mỗi lệnh còn dư
-        alt GTC và chưa vượt giới hạn rollover
+        alt GTC, chưa vượt giới hạn rollover và deadline ≥ next_cutoff + biên_an_toàn
             E->>OB: status=ROLLED_OVER, sessions_alive += 1
         else IOC
             E->>OB: status=CANCELLED
-        else GTC vượt giới hạn
+        else GTC vượt giới hạn rollover hoặc sắp quá deadline
             E->>OB: status=EXPIRED
         end
     end
     E-->>S: MatchResult[] + rollover_report
 ```
+
+### 6.1. Ràng buộc từ hợp đồng
+
+- `time_in_force` **không nằm trong struct `Order` được ký** [D, §3.2], nên hợp đồng không bảo đảm engine tôn trọng GTC/IOC mà người dùng chọn. Giới hạn **thời gian** duy nhất do người dùng ký là `deadline` (`amount` và `pricePerUnit` cũng được ký nhưng không liên quan tới phiên). [D, §3.4] khai báo lỗi `SignatureExpired`, nhưng quy trình xác minh ở [D, §3.3] chỉ liệt kê bốn bước (chữ ký, điều kiện giá, hạn mức còn lại của phía bid, cập nhật và chuyển tài sản) và **không liệt kê** kiểm `deadline`, `nonce`, hủy lệnh (`OrderAlreadyCancelledOrFilled` có trong interface), hai lệnh cùng `tokenId`, đúng vai trò BID/ASK, hay người mua khác người bán; cần Đức xác nhận hợp đồng có thực sự kiểm các điều này (Đ14). Hai hướng cần chốt về `time_in_force`: (a) thêm `timeInForce` vào `ORDER_TYPEHASH`: **không giúp hợp đồng thực thi IOC**, vì hợp đồng không có khái niệm phiên hay cutoff; IOC có thể thực thi bằng `deadline` ngắn (client đặt `deadline = cutoff + biên_an_toàn`) mà không đổi struct, và (a) chỉ có ý nghĩa nếu hợp đồng lưu thêm `sessionId`; (b) giữ ngoài chuỗi và coi là tùy chọn không tin cậy của engine, khi đó rollover GTC chỉ là hành vi mặc định trong khoảng `deadline`.
+- Lệnh bị hủy trên chuỗi (`cancelOrder`, event `OrderCancelled`) hoặc vô hiệu do `incrementNonce` (event `UserNonceIncremented`) phải bị loại khỏi snapshot; engine lắng nghe các event này. Hủy ngoài chuỗi qua API (§8.2) chỉ là yêu cầu tới engine: nếu engine ngoại tuyến hoặc không tuân thủ, chữ ký cũ vẫn còn hiệu lực đến `deadline`; muốn bảo đảm cứng người dùng phải gọi `cancelOrder` on-chain.
+- **Kiểm tra trạng thái ngay trước khi gửi:** engine có thể đã ngoại tuyến khi người dùng gọi `incrementNonce` hoặc `cancelOrder`, nên lệnh `ROLLED_OVER` nằm trong sổ có thể đã vô hiệu mà engine chưa biết. Trước mỗi lần gửi settlement, engine đọc lại nonce hiện tại, trạng thái hủy và `filledAmount` của cả hai lệnh; lệnh không hợp lệ bị loại và **chỉ các cặp liên quan bị bỏ**, không tính lại toàn phiên. Đây là ngoại lệ có chủ đích của bất biến "cùng snapshot → cùng kết quả" (trạng thái on-chain không nằm trong snapshot). Không tính lại toàn phiên còn để tránh quyền chọn miễn phí: nếu người tham gia thấy giá khớp trước settlement rồi gọi `cancelOrder`/`incrementNonce` hoặc rút `approve` để ép engine tính lại hay làm revert, họ có thể thăm dò giá không tốn chi phí; vì vậy `match.executed` chỉ là thông tin chưa chắc chắn (§8.3).
+- **Cuộc đua với `deadline`:** khớp ở cutoff không đảm bảo giao dịch on-chain nằm trong hạn; nếu block chứa giao dịch có timestamp sau `deadline` thì hợp đồng revert `SignatureExpired` **với điều kiện [D] thực sự kiểm `deadline`** (Đ14); nếu không kiểm, lệnh hết hạn vẫn có thể bị settle. Engine loại lệnh có `deadline < cutoff + biên_an_toàn` (biên cần chốt, tối thiểu bằng thời gian xác nhận block ước tính cộng thời gian chờ batch).
+- **Phân bổ bằng 0:** pro-rata sau `floor` có thể cho `matchAmount = 0` với lệnh nhỏ; engine bỏ qua các lần khớp bằng 0, không gửi lên chuỗi (hợp đồng của Đức yêu cầu số lượng dương hay không là điểm cần xác nhận).
+- Khối lượng đã khớp lấy từ `filledAmount[orderId]` on-chain; `remaining = amount − filledAmount − in_flight`, với `in_flight` là các khớp đã gửi mà chưa có `TradeSettled` hoặc revert. Engine đồng bộ **trước** khi khớp phiên mới (§8.4). Nếu không trừ `in_flight`, settlement của phiên trước chưa được đào xong sẽ làm engine phân bổ lại cùng khối lượng đó: phía bid bị revert `OrderAmountExceeded`, nhưng phía ask **không được [D] chặn** (Đ2) nên lệnh bán có thể bị khớp vượt `amount` nếu người bán còn token và `approve`.
 
 Giới hạn: rollover không bảo đảm khớp ở phiên sau; cần `max_rollover_count` hoặc TTL để orderbook không phình vô hạn (**giá trị chưa chốt**, §11). Cơ chế carry-over giữa các phiên đã được mô tả cho batch auction ở [R3]; mô tả rollover theo mô hình sequential của bài về VCM [R1] **chưa được kiểm chứng** vì chưa đọc toàn văn.
 
@@ -175,15 +220,28 @@ Giới hạn: rollover không bảo đảm khớp ở phiên sau; cần `max_rol
 
 ## 7. Quy tắc xác định giá (cần chốt)
 
-Hai lựa chọn khác nhau về bản chất, spec **chưa chọn**:
+Có **ba** quy tắc để so sánh. Ký hiệu cho thị trường nhiều lệnh một đơn vị (mở rộng nhiều đơn vị theo từng đơn vị): `b(j)` là bid thứ j giảm dần, `a(j)` là ask thứ j tăng dần, `m*` là số cặp khớp (`b(j) ≥ a(j)`), `b_m = b(m*)`, `a_m = a(m*)`, `b_next` là bid cao nhất chưa khớp, `a_next` là ask thấp nhất chưa khớp.
 
-| | Giá theo từng cặp (baseline hiện tại) | Giá chung của phiên |
-|---|---|---|
-| Công thức | `p_ij = k·b_i + (1−k)·a_j` cho từng cặp khớp | một `p*` cho mọi khớp trong phiên, ví dụ trung điểm cặp biên `(b_m + a_m)/2` |
-| Ưu điểm | Dễ cài đặt, đúng như code | Cùng lệnh, cùng giá; gần mô hình uniform-price của [R3] |
-| Nhược điểm | Các lệnh cùng phía nhận giá khác nhau; khó giải thích tính công bằng | Cần định nghĩa khi có nhiều nghiệm giá; phải kiểm tra `p*` thuộc [ask, bid] của mọi lệnh được khớp |
+| | Giá theo từng cặp (`pair`, baseline hiện tại) | Giá chung "cặp biên" (`marginal`) | Giá chung k-double auction (`kda`) |
+|---|---|---|---|
+| Công thức | `p_j = k·b(j) + (1−k)·a(j)` cho từng cặp | mọi cặp: `k·b_m + (1−k)·a_m` | mọi cặp: `p = k·hi + (1−k)·lo`, `hi = min(b_m, a_next)`, `lo = max(a_m, b_next)` |
+| Tương đương | — | — | `p = (1−k)·s(m) + k·s(m+1)` với `s(i)` là báo giá thứ i (tăng dần) trong 2m báo giá gộp khi có đúng m bid và m ask |
+| `ask ≤ p ≤ bid` cho mọi cặp được khớp | có | có | có (`[lo, hi] ⊂ [a_m, b_m]`) |
+| Làm sạch thị trường | không áp dụng | **không**: có thể còn ask chưa khớp sẵn lòng bán ở `p`. Ví dụ BID 10, ASK 1, ASK 2, `k = 1/2`: `p = 5,5` nhưng ASK 2 không được khớp | có: `p` nằm trong khoảng giá cân bằng cung–cầu đã khai |
+| Kết quả lý thuyết | chưa tìm thấy (xem dưới) | không có | có ở `k = 1` [SW89]; `k` khác: chưa kiểm chứng (xem dưới) |
+| Nhược điểm | các lệnh cùng phía nhận giá khác nhau; khó giải thích công bằng | không dùng làm ứng viên | giá phụ thuộc cả lệnh không khớp (`a_next`, `b_next`); cần cài đặt cẩn thận khi thiếu một trong hai |
 
-Cả hai đều **không** bảo đảm khai giá trung thực (midpoint/k-rule không strategy-proof; xem phản ví dụ trong đề cương nội bộ). Phần mô phỏng §9 nên chạy được trên cả hai quy tắc để so sánh.
+**Trường hợp thiếu lệnh kế tiếp và số lệnh hai phía khác nhau:** khi không có `a_next` (mọi ask đã khớp) thì `hi = b_m`; khi không có `b_next` (mọi bid đã khớp) thì `lo = a_m`; vì vậy `[lo, hi] ⊂ [a_m, b_m]` vẫn đúng và `p` luôn nằm trong khoảng của mọi cặp được khớp. Công thức tương đương `(1−k)·s(m) + k·s(m+1)` chỉ áp dụng khi có đúng `m` bid và `m` ask một đơn vị; với số lệnh hai phía khác nhau dùng công thức `k·hi + (1−k)·lo`.
+
+**Quy tắc `marginal` là ví dụ trong bản spec trước ("trung điểm cặp biên") và bị loại khỏi danh sách ứng viên** vì không làm sạch thị trường (phản ví dụ ở bảng trên); giữ lại chỉ để đối chứng thực nghiệm.
+
+**Căn cứ cho `kda`.** Satterthwaite & Williams (1989) [SW89] (đã đọc toàn văn): trong "buyer's bid double auction" (tương ứng `k = 1`) giá đặt tại `s(m+1)` của 2m báo giá gộp; người bán khai đúng giá trị là chiến lược trội; ở mọi cân bằng người mua khai thấp hơn giá trị thật tối đa O(1/m) bất kể phân phối (theo phát biểu của bài; các giả thiết chính quy chưa đối chiếu); với các cách chọn giá khác thì **cả hai phía** đều khai lệch. Cân bằng của người mua **không tuyến tính** (nghiệm một phương trình vi phân). Rustichini, Satterthwaite & Williams (1994) [RSW94] (mới đọc tóm tắt): với giá "đặt để cân bằng cung–cầu đã khai", ở mọi cân bằng mức khai lệch là O(1/m) và mất hiệu quả là O(1/m²). Việc kết quả này **đúng cho mọi `k ∈ [0,1]`** chưa được kiểm chứng từ nguồn gốc (tóm tắt không nêu `k`); một tham vấn Argon cho là đúng nhưng chưa có đối chiếu độc lập. Quy tắc `kda` ở bảng trên là khái quát hóa của nhóm từ `k = 1` sang `k` bất kỳ theo hướng "giá nằm trong khoảng cân bằng cung–cầu", nhất quán với [SW89] ở `k = 1`.
+
+**Với giá theo từng cặp không có định lý công bố** về tốc độ hội tụ (tham vấn Argon cũng không biết kết quả nào; chưa tìm được nguồn). Giả thuyết "hội tụ chậm hơn" đã được đo sơ bộ ở mục 9.5 (thí nghiệm C): đúng ở `k = 1` (độ dốc ≈ −0,96 so với ≈ −2,1 của `kda`), **không** đúng ở `k = 0,5` (cả hai ≈ −2,1). Chỉ trích kèm các giới hạn ở mục 9.5.
+
+**Thứ tự ghép cặp (quy tắc `pair`):** bid giá cao nhất ghép với ask giá thấp nhất; cùng giá thì theo tuổi rồi `order_id` (hoặc `seq` với `fifo`). Thứ tự này quyết định cặp nào nhận giá nào nên phải cố định và công bố; phép kẹp vào `[ask, bid]` trong engine chỉ là lớp phòng vệ, bất biến được bảo đảm bởi cách ghép.
+
+**Đề xuất (chờ nhóm chốt):** chọn `kda` làm quy tắc giá mặc định vì (i) có cơ sở lý thuyết ở tài liệu gốc cho `k = 1` ([SW89]) và nhất quán với hướng của [RSW94] (phạm vi theo `k` chưa kiểm chứng), (ii) mọi lệnh khớp cùng giá, dễ giải thích, (iii) giữ ràng buộc cứng `ask ≤ p ≤ bid` mà hợp đồng kiểm (§3.3). Cả ba quy tắc **không** bảo đảm khai giá trung thực (k-rule không strategy-proof; ngay cả `k = 1` người bán trung thực nhưng người mua vẫn khai thấp). Phần mô phỏng §9 chạy trên cả ba để so sánh.
 
 ---
 
@@ -192,15 +250,15 @@ Cả hai đều **không** bảo đảm khai giá trung thực (midpoint/k-rule 
 ### 8.1. Nguyên tắc
 
 - REST cho đặt/hủy/truy vấn; WebSocket cho cập nhật thời gian thực.
-- Lệnh ghi phải kèm chữ ký **EIP-712** (cấu trúc domain/struct do Đức quy định). Engine xác minh chữ ký **ngoài chuỗi** trước khi nhận lệnh và không giữ private key người dùng.
-- API không khóa tài sản khi đặt lệnh; kiểm tra `balanceOf`/`isApprovedForAll` là trách nhiệm client. Tài sản chỉ chuyển ở bước settlement.
+- Lệnh ghi phải kèm chữ ký **EIP-712** với domain và struct `Order` theo [D, §3.2] (domain `EPU Carbon Double Auction`, version `2.0`, `chainId` 80002 trên Polygon Amoy). Engine xác minh chữ ký **ngoài chuỗi** để lọc sớm lệnh sai, không giữ private key người dùng; hợp đồng **xác minh lại on-chain** khi settlement [D, §3.3, bước 1], nên engine không phải điểm tin cậy duy nhất cho tính hợp lệ của lệnh.
+- API không khóa tài sản khi đặt lệnh (mô hình non-custodial [D, §3.1]); người mua cần `approve` token thanh toán, người bán cần `setApprovalForAll`. Engine có thể kiểm tra `balanceOf`/`allowance` khi nhận lệnh để loại lệnh chắc chắn revert, nhưng kết quả chỉ có tính tham khảo vì số dư thay đổi sau đó.
 
 ### 8.2. REST
 
 | Method | Path | Mô tả | Request (rút gọn) | Response |
 |---|---|---|---|---|
-| `POST` | `/v1/orders` | Đặt lệnh | `{order_type, token_id, amount, price, time_in_force, expiry, trader_address, signature}` | `201 {order_id, status:"NEW"}` |
-| `DELETE` | `/v1/orders/{order_id}` | Hủy lệnh trước cutoff | `{signature}` | `200 {order_id, status:"CANCELLED"}` |
+| `POST` | `/v1/orders` | Đặt lệnh | `{order:{orderId, trader, orderType, tokenId, amount, pricePerUnit, nonce, deadline}, signature, time_in_force}` | `201 {orderId, status:"NEW"}` |
+| `DELETE` | `/v1/orders/{order_id}` | Yêu cầu engine bỏ lệnh khỏi các phiên sau (xem §6.1: không thay thế `cancelOrder` on-chain) | `{signature}`: chữ ký EIP-712 của `trader` trên thông điệp `CancelRequest{orderId, cancel_nonce, deadline}` (định dạng và domain chưa chốt; không có `cancel_nonce` và hạn thì phát lại được) | `200 {orderId, status:"CANCEL_REQUESTED"}` (chữ ký cũ vẫn còn hiệu lực on-chain đến `deadline`) |
 | `GET` | `/v1/orders/{order_id}` | Trạng thái lệnh | — | `200 {…Order, status, remaining_amount}` |
 | `GET` | `/v1/orderbook/{token_id}` | Snapshot sổ lệnh | — | `200 {bids, asks}` |
 | `GET` | `/v1/sessions/{session_id}/matches` | Kết quả khớp của phiên | — | `200 {matches}` |
@@ -213,8 +271,8 @@ Mã lỗi tối thiểu: `400` (sai cấu trúc/giá trị), `401` (chữ ký sa
 | Kênh | Sự kiện | Payload |
 |---|---|---|
 | `orderbook.{token_id}` | `orderbook.update` | Delta top-of-book |
-| `session.{session_id}` | `match.executed` | `MatchResult` kèm `trade_hash`, trước khi gửi on-chain |
-| `session.{session_id}` | `settlement.confirmed` | Khi nhận event `TradeExecuted` |
+| `session.{session_id}` | `match.executed` | `MatchResult` kèm `trade_hash`, trạng thái `pending` (chưa settlement, **chưa chắc chắn**: có thể bị loại hoặc revert; xem §6.1) |
+| `session.{session_id}` | `settlement.confirmed` | Khi nhận event `TradeSettled` [D, §3.4] |
 | `session.{session_id}` | `settlement.failed` | Khi giao dịch revert; retry có giới hạn, không lặp vô hạn |
 
 ### 8.4. Luồng settlement và giới hạn tin cậy
@@ -225,35 +283,38 @@ sequenceDiagram
     participant SUB as Settlement Submitter
     participant SC as CarbonDoubleAuction.sol
 
+    E->>E: đồng bộ remaining = amount − filledAmount − in_flight, loại lệnh đã hủy hoặc vô hiệu
     E->>E: run_periodic_double_auction() ra MatchResult[]
-    E->>E: tính trade_hash
-    E->>SUB: MatchResult và trade_hash
-    SUB->>SC: settleMatchedTrade(tradeHash, buyer, seller, tokenId, amount, pricePerUnit)
-    SC-->>SUB: TradeExecuted hoặc revert
+    E->>SUB: MatchedTrade[] (bidOrder, askOrder, 2 chữ ký, matchAmount, clearingPrice)
+    SUB->>SC: batchSettleMatchedTrades(trades) hoặc settleMatchedTrade(trade)
+    SC-->>SUB: TradeSettled hoặc revert (PriceMismatch, OrderAmountExceeded, ...)
     SUB-->>E: cập nhật status hoặc ghi log lỗi
 ```
 
-**Giới hạn của thiết kế hiện tại (phát hiện khi đối chiếu với contract, cần trao đổi với Đức):**
-1. `settleMatchedTrade` **chỉ chuyển token carbon** từ seller sang buyer; không có bước thanh toán tiền. `pricePerUnit` chỉ được ghi lại. Vì vậy chưa có settlement nguyên tử (delivery-versus-payment, DvP) như mô tả ở báo cáo Giai đoạn 1. Mô hình DvP phổ biến chuyển tài sản và tiền trong cùng một giao dịch, thường dùng ERC-20 cho tiền và ERC-721/1155 cho tài sản, và hoàn tác toàn bộ nếu thiếu tiền [S2]. Cần bổ sung leg thanh toán (ví dụ ERC-20 test) trong cùng giao dịch. Lưu ý: các nguồn [S2] là tài liệu vendor/blog; chưa tìm thấy nguồn nào mô tả riêng một triển khai ERC-1155 DvP.
-2. Chữ ký EIP-712 chỉ được xác minh ngoài chuỗi; contract không kiểm tra. Toàn bộ niềm tin dồn vào `matchingAgentAddress`: tác tử này có thể bỏ sót lệnh, ưu tiên sai hoặc gửi cặp khớp không có thật mà contract không phát hiện. Nếu muốn giảm giả định tin cậy, contract cần xác minh chữ ký của buyer/seller và ràng buộc giá (`ask ≤ p ≤ bid`) on-chain.
-3. `settleMatchedTrade` là `onlyMatchingAgent`, nên Settlement Submitter chính là địa chỉ đó; quản lý khóa là việc của thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
-4. Thứ tự giao dịch on-chain vẫn chịu rủi ro MEV/front-running [R9]; chữ ký lệnh không loại bỏ rủi ro này.
+**Trạng thái đối chiếu với spec hợp đồng của Đức [D] (đã đọc bản v2, commit `3194bad`, branch `docs/smart-contract-spec`, chưa merge vào `main`):**
+- *Thanh toán nguyên tử:* bản `CarbonDoubleAuction.sol` hiện trên `main` chỉ chuyển token carbon, không có bước trả tiền; [D, §3.1] thiết kế một giao dịch chuyển cả token thanh toán ERC-20 lẫn token carbon và hoàn tác toàn bộ nếu thiếu. Mô hình này phù hợp với DvP thông dụng [S2] (nguồn vendor/blog, không có nguồn riêng cho ERC-1155). **Mã trong `contracts/` chưa được cập nhật theo [D]**, nên đến lúc đó phần thiết kế mới là kế hoạch, không phải hành vi đã có.
+- *Xác minh chữ ký và giá on-chain:* [D, §3.3] liệt kê bốn bước: khôi phục chữ ký (viết cho phía bid; phía ask ngầm hiểu), `ask ≤ clearingPrice ≤ bid`, `filledAmount[bidId] + matchAmount ≤ bidOrder.amount` (**chỉ phía bid**), rồi cập nhật và chuyển tài sản. Điều này **giảm** giả định tin cậy vào engine (không gửi được cặp khớp không có chữ ký hoặc ngoài khoảng giá), nhưng **chưa đủ**: [D] không liệt kê kiểm `filledAmount` phía ask, `deadline`, `nonce` hay hủy lệnh, hai lệnh cùng `tokenId`, đúng vai trò BID/ASK, người mua khác người bán (Đ2, Đ14). Cho đến khi Đức xác nhận, engine phải tự kiểm các điều này trước khi gửi (§6.1) và không coi hợp đồng là chốt chặn cuối. Phần còn lại engine có thể làm sai mà hợp đồng không phát hiện: bỏ sót hoặc ưu tiên sai lệnh hợp lệ (vi phạm công bằng thứ tự, không vi phạm điều kiện on-chain), chọn `clearingPrice` thiên lệch trong khoảng [ask, bid], và trì hoãn phiên.
+- *Vận hành engine:* người vận hành thấy toàn bộ luồng lệnh trước cutoff nên về nguyên tắc có thể giao dịch ngoài chuỗi trước (front-run off-chain) hoặc ưu tiên lệnh của mình; hợp đồng không phát hiện được. Cần ràng buộc vận hành (engine không tham gia thị trường, công bố băm snapshot lệnh trước cutoff để kiểm tra sau) — chưa có thiết kế cụ thể.
+- *Quyền gọi:* [D] cần quy định rõ ai được gọi `settleMatchedTrade` (code `main` dùng `onlyMatchingAgent`); quản lý khóa của Settlement Submitter thuộc thiết kế bảo mật GĐ2 (mục IV, tuần 5–8 của Google Doc).
+- *MEV/front-running:* [R9] mô tả front-running trên DEX; ở thiết kế này giá đã cố định trong lệnh ký và `clearingPrice` do engine chọn, nên rủi ro thực chủ yếu là sắp xếp lại thứ tự giữa settlement với `cancelOrder`/`incrementNonce`/thu hồi `approve`, và phụ thuộc ai được gọi hàm settle (Đ9). Khẳng định "validator không thể chèn lệnh trục lợi" trong [D, §4] chỉ đúng một phần và cần Đức xem lại.
+- *Batch:* `batchSettleMatchedTrades` bọc từng cặp trong kiểm tra độc lập để một lệnh lỗi không chặn cả phiên [D, §4]; engine cần giới hạn kích thước batch theo gas (ước tính của [D, §5]: 10 cặp ≈ 920.000 gas — số liệu của Đức, chưa được kiểm chứng độc lập).
 
 ---
 
 ## 9. Kế hoạch mô phỏng thực nghiệm
 
-> Đây là **kế hoạch**, chưa có kết quả chính thức.
+> Mục này gồm kế hoạch và **kết quả sơ bộ** (9.5, 9.6); chỉ trích theo đúng giới hạn ghi ở đó.
 
 ### 9.1. Điều kiện để thí nghiệm có ý nghĩa
 
 Kiểm tra sơ bộ bằng baseline hiện có (3 seed, 500 lệnh, giá khai = valuation thật, k ∈ {0, 0.5, 1}) cho thấy **thặng dư xã hội giống hệt nhau với mọi k** (ví dụ 14482.81); k chỉ đổi cách chia giữa bên mua và bên bán (buyer/seller surplus: 14482.81/0 khi k=0, ≈ một nửa mỗi bên khi k=0.5, 0/14482.81 khi k=1). Điều này đúng với lý thuyết: với allocation và valuation cố định, giá chỉ phân chia lợi ích. Vì vậy thiết kế thí nghiệm phải tách hai câu hỏi:
 
-- **Thí nghiệm A — phân chia thặng dư khi khai giá trung thực.** Đo `buyer_surplus`, `seller_surplus`, `welfare` theo k. `welfare` bất biến theo k đóng vai trò **kiểm tra tính đúng (sanity check)**, không phải kết quả nghiên cứu.
+- **Thí nghiệm A — phân chia thặng dư khi khai giá trung thực.** Đo `buyer_surplus`, `seller_surplus`, `welfare` theo k. `welfare` bất biến theo k đóng vai trò **kiểm tra tính đúng (sanity check)**, không phải kết quả nghiên cứu. Bất biến này mới được kiểm chứng bằng code cho quy tắc giá theo từng cặp; với giá chung của phiên (§7) phân bổ vẫn như cũ nên welfare lẽ ra không đổi, nhưng điều kiện `ask ≤ p* ≤ bid` của mọi cặp được khớp phải kiểm riêng khi cài đặt quy tắc đó.
 - **Thí nghiệm B — tác tử khai giá chiến lược.** Cho tác tử shading giá (bid thấp hơn / ask cao hơn valuation) theo hàm phụ thuộc k (theo hướng mô hình [R4]) hoặc theo chiến lược thích nghi. Đo `welfare`, khối lượng khớp và tỷ lệ giao dịch bị mất so với benchmark khai trung thực. Chỉ ở thí nghiệm này k mới có thể ảnh hưởng đến welfare.
 
 **Hướng thiết kế cho thí nghiệm B:**
-- *Đối chứng giải tích (một mua – một bán, một đơn vị):* mô hình Chatterjee–Samuelson [R4] với valuation phân phối đều trên [0,1] và k = 1/2 có cân bằng Bayes tuyến tính; theo các nguồn thứ cấp [S4], bid = (2/3)v + 1/12, ask = (2/3)c + 1/4, nên giao dịch chỉ xảy ra khi v − c ≥ 1/4 và một phần giao dịch có lợi bị bỏ lỡ (hệ quả trực quan của bất khả thi Myerson–Satterthwaite [R7]). **Các hệ số này chưa được đối chiếu với bài gốc [R4]**; phải kiểm tra trước khi đưa vào báo cáo. Cân bằng của k-double auction không duy nhất, nên đây chỉ là một lựa chọn cân bằng. Nếu hệ số khớp, kết quả dùng làm bài kiểm tra tính đúng của mô phỏng (mô phỏng 1v1 phải tái tạo ngưỡng này).
+- *Đối chứng giải tích (một mua – một bán, một đơn vị):* mô hình Chatterjee–Samuelson [R4] với valuation phân phối đều trên [0,1] và k = 1/2 có cân bằng Bayes tuyến tính; theo các nguồn thứ cấp [S4], bid = (2/3)v + 1/12, ask = (2/3)c + 1/4, nên giao dịch chỉ xảy ra khi v − c ≥ 1/4 và một phần giao dịch có lợi bị bỏ lỡ (hệ quả trực quan của bất khả thi Myerson–Satterthwaite [R7]). Đối chiếu đến nay: (i) hai bài arXiv độc lập nêu cùng hệ số (arXiv:1207.4171 và arXiv:1210.5541), (ii) tính lại bằng tìm kiếm phản ứng tối ưu số trên lưới (k = 0,5: bid ≈ 0,09 + 0,66v, ask ≈ 0,25 + 0,66c) — kết quả tuyến tính này đúng trên miền v ≥ 1/4; bên dưới đó chiến lược là từng đoạn tuyến tính, (iii) **suy ra dạng đóng cho mọi k** từ điều kiện bậc nhất (Claude và một model reviewer độc lập cùng ra kết quả): `bid = k(1−k)/(2(1+k)) + v/(1+k)`, `ask = (1−k)/2 + c/(2−k)` (tương đương `bid = (v + k·g)/(1+k)` với `g` là hệ số chặn của ask, `ask = (c + (1−k)(a+b))/(2−k)` với `a`, `b` là hệ số chặn và độ dốc của bid), với k = 0,25 → bid = 0,075 + 0,8v, ask = 0,375 + (4/7)c; k = 0,5 → như trên; k = 0,75 → bid = 3/56 + (4/7)v, ask = 0,125 + 0,8c. Phép tìm lưới ở (ii) cho k ≠ 0,5 từng sai tới 0,04 ở độ dốc, nên **không dùng xấp xỉ lưới**. **Chưa đối chiếu dạng đóng với bài gốc [R4]** (chưa có toàn văn); cần kiểm tra trước khi trích trong báo cáo. Cân bằng của k-double auction không duy nhất, nên đây chỉ là một lựa chọn cân bằng. Kết quả dùng làm bài kiểm tra tính đúng của mô phỏng (mô phỏng 1v1 phải tái tạo ngưỡng này).
+- *Giá trị lý thuyết 1 mua – 1 bán với chiến lược trên (k = 0,5):* giao dịch xảy ra khi và chỉ khi v − c ≥ 1/4, nên xác suất giao dịch = 9/32 ≈ 0,281 và efficiency = 27/32 ≈ 0,844 (suy ra hai lần độc lập, kiểm bằng Monte Carlo 2·10⁶ mẫu). Một nguồn thứ cấp nêu "xác suất bỏ lỡ giao dịch 1/6": con số này không khớp với 7/32 (xác suất bỏ lỡ so với mọi cặp) hay 7/16 (so với các cặp có v > c) tính ở đây; reviewer cho rằng 1/6 có thể là thặng dư kỳ vọng tối đa E[(v − c)⁺] = 1/6 hoặc mức mất tương đối 5/32 ≈ 0,156 bị làm tròn. **Chưa kiểm chứng** vì chưa đọc nguồn đó; không trích 1/6 vào báo cáo.
 - *Nhiều lệnh, nhiều đơn vị (100–500 lệnh):* kết quả giải tích trên không áp dụng trực tiếp. Hướng dự kiến là tác tử học thích nghi kiểu Zero-Intelligence Plus (ZIP) [S5]; chưa tìm được nguồn về bid shading phụ thuộc k trong bối cảnh nhiều đơn vị, nên chiến lược cụ thể vẫn là câu hỏi mở (§11).
 
 > **Cần trao đổi với Huy/GVHD:** mô tả nhiệm vụ trên Google Doc ("so sánh social welfare giữa k = 0, 0.5, 1 để tìm tham số tối ưu") chỉ có nghĩa nếu có thí nghiệm B. Nên chỉnh lại câu chữ nhiệm vụ cho khớp.
@@ -264,8 +325,8 @@ Kiểm tra sơ bộ bằng baseline hiện có (3 seed, 500 lệnh, giá khai = 
 |---|---|
 | Số lệnh | 100, 200, 500 |
 | k | 0, 0.5, 1 |
-| Quy tắc giá | theo cặp (baseline) và giá chung của phiên (§7) |
-| Tie-break | `fifo` và `age_prorata` (§5.2) — chỉ khi đã code |
+| Quy tắc giá | theo cặp `pair` (baseline), giá chung `kda` (ứng viên mặc định) và `marginal` (chỉ đối chứng), xem §7 |
+| Tie-break | `fifo` và `age_prorata` (§5.2); đã có cài đặt trong `session_engine.py`, chưa chạy so sánh bằng mô phỏng |
 | Phân phối valuation | uniform làm điểm khởi đầu; **chưa chốt** |
 | Số lần lặp | ≥ 30 seed mỗi cấu hình (đề xuất, chưa chốt) |
 | `token_id` | một lớp tín chỉ cố định |
@@ -292,7 +353,42 @@ for k in (0, 0.5, 1):
             log(k, n, seed, welfare(matches, base), buyer_surplus(...), seller_surplus(...), fill_rate(...))
 ```
 
-Đầu ra dự kiến: script trong `system_agents/matching_engine/simulation/` (chưa tồn tại) và bảng/biểu đồ chỉ đưa vào báo cáo sau khi đã chạy thật.
+### 9.5. Kết quả đã chạy (08/11 đến 10/11/2026, `system_agents/matching_engine/simulation/`)
+
+Mã: `generator.py`, `metrics.py`, `strategies.py`, `run_experiment.py` (A), `run_experiment_b.py` (B1, B2); `kda_sim.py`, `equilibrium_search.py`, `run_experiment_c.py` (C); toàn bộ suite test pass ở lần chạy gần nhất. Kết quả: `results/exp_a_*`, `results/exp_b2_*`, `results/exp_c_*`. Mỗi thí nghiệm do một agent viết, được kiểm lại bằng cài đặt độc lập và một reviewer model khác; hợp đồng (`CONTRACT.md`) do người phụ trách giữ.
+
+| Thí nghiệm | Kết quả | Cách đọc đúng |
+|---|---|---|
+| A (khai trung thực; k ∈ {0, 0,5, 1}; n ∈ {100, 200, 500}; 30 seed) | welfare **bằng nhau** với mọi k ở 90 cặp (n, seed); `buyer_share` = 1,000 / 0,500 / 0,000; efficiency = 1 | **Kiểm tra đúng đắn của bộ mô phỏng**, không phải phát hiện: với khai trung thực `buyer_share = 1 − k` là hệ quả đại số của `p = k·bid + (1−k)·ask`, và quyết định khớp không phụ thuộc k. Độ lệch ~1e-4 ở k = 0,5 do làm tròn giá về 0,01. |
+| B1 (1 mua – 1 bán, k = 0,5) | tần suất giao dịch 0,283 (lý thuyết 0,281); efficiency 0,847 (0,844) | Khớp mỏ neo giải tích; test còn kiểm k = 0,25 và 0,75 với tích phân số. |
+| B2 (nhiều lệnh, λ ∈ {0 … 1}, k ∈ {0,25; 0,5; 0,75}) | efficiency ≈ 1,000 → 0,92–0,94 khi λ tăng 0 → 1; không tăng rõ theo n ở n = 100–500 (hội tụ lên một giới hạn < 1, §9.6); `buyer_share` ở λ = 1 lệch khỏi 1 − k (k = 0,25 và 0,75 cho ≈ 0,44 và ≈ 0,57) | **Độ nhạy với cường độ khai giá ngoại sinh**, không phải cân bằng thị trường. Mất phúc lợi chỉ đến từ hụt khối lượng giao dịch (chiến lược đơn điệu giữ thứ tự ưu tiên). |
+| C (cân bằng xấp xỉ; một đơn vị mỗi lệnh; m = 2, 4, 8, 16; k ∈ {0,5; 1}; ba quy tắc giá; 24 cấu hình; 40.000 kịch bản huấn luyện, 400.000 kịch bản đánh giá) | Mất hiệu quả theo m = 2 / 4 / 8 / 16. **k = 1:** `kda` 0,0735 / 0,0181 / 0,00406 / 0,00093; `pair` 0,1079 / 0,0509 / 0,0271 / 0,0145; `marginal` 0,0990 / 0,0336 / 0,0104 / 0,00307. **k = 0,5:** `kda` 0,0671 / 0,0153 / 0,00394 / 0,00076; `pair` 0,0727 / 0,0156 / 0,00365 / 0,00082; `marginal` 0,0714 / 0,0171 / 0,00436 / 0,00111. Độ dốc log–log OLS của mất hiệu quả theo m (m = 2…16, khoảng tin cậy 95% với 2 bậc tự do): k = 1: `kda` −2,11 ± 0,09, `pair` −0,96 ± 0,13, `marginal` −1,67 ± 0,14; k = 0,5: `kda` −2,13 ± 0,24, `pair` −2,15 ± 0,07, `marginal` −2,00 ± 0,07. Ở k = 1 so với Bảng 6.1 của [SW89] (0,0742 / 0,0175 / 0,0042 cho m = 2 / 4 / 8): sai lệch tương đối 0,9% / 3,4% / 3,3%, vượt khoảng tin cậy lấy mẫu của phép đánh giá. | **Sơ bộ.** (i) `kda` giảm gần O(1/m²) ở cả hai k: nhất quán với [RSW94] ở k = 1; phần k = 0,5 là số liệu của nhóm, chưa có định lý đã kiểm chứng. (ii) `pair` chậm rõ ở k = 1 (gần O(1/m)) nhưng giảm như `kda` ở k = 0,5; giải thích khả dĩ của nhóm (chưa kiểm): ở k = 1 người mua trả đúng giá mình đặt, giống pay-as-bid, nên động cơ khai thấp mạnh hơn. (iii) Mỗi độ dốc chỉ dựa trên 4 điểm m nên khoảng tin cậy là xấp xỉ thô; mọi cấu hình có `converged = False` theo `tol`; ε (eps_xval tương đối) lớn nhất 3,0·10⁻² (`pair`, k = 0,5, m = 2) và 1,9·10⁻² (`marginal`, k = 0,5), tức với hai quy tắc đó ở k = 0,5 sai số cân bằng không nhỏ; ε chỉ đo lệch của một người, từng điểm, nên là cận dưới. (iv) Chưa có: nhiều đơn vị mỗi lệnh, m > 16, kiểm chéo bằng thuật toán tìm cân bằng khác; không trích số mũ chính xác. |
+
+**Giới hạn bắt buộc khi trích dẫn:**
+- Mẫu giữa các n **lồng nhau** (cùng seed, mẫu n nhỏ là tiền tố của mẫu n lớn): đây là common random numbers, không phải mẫu độc lập.
+- Engine định giá **theo từng cặp**; các kết quả cân bằng trong tài liệu (Chatterjee–Samuelson, Rustichini–Satterthwaite–Williams) nói về cơ chế giá đồng nhất. Không gọi kết quả này là "giá cân bằng đồng nhất".
+- Hệ số tuyến tính là cân bằng của thị trường 1 mua – 1 bán một đơn vị; chuyển sang nhiều lệnh nhiều đơn vị chỉ là heuristic, nên **không** được kết luận "thị trường chiến lược đạt ~93% hiệu quả", "hiệu quả không cải thiện khi n tăng" (efficiency thực ra hội tụ lên một giới hạn < 1 vì λ cố định; giới hạn giải tích ở §9.6) hay xếp hạng các k theo efficiency (chênh lệch nằm trong độ lệch chuẩn, và dưới λ = 1 chưa phải cân bằng).
+- Đã làm sơ bộ (hàng C): ε-equilibrium cho thị trường một đơn vị mỗi lệnh. Chưa làm: nhiều đơn vị mỗi lệnh; kiểm chéo bằng thuật toán tìm cân bằng khác; đọc toàn văn [RSW94] (mới đọc tóm tắt), nên O(1/m²) chỉ mới đối chiếu qua tóm tắt và qua Bảng 6.1 của [SW89] ở k = 1.
+
+### 9.6. Đối chiếu với tham vấn Argon (mức suy nghĩ "Cao", 08/11/2026)
+
+Câu trả lời do người phụ trách chuyển lại bằng văn bản; mỗi ý dưới đây ghi trạng thái kiểm chứng của nhóm, không chuyển nguyên văn thành kết luận.
+
+| Ý của Argon | Trạng thái | Cách kiểm |
+|---|---|---|
+| Xác suất giao dịch 9/32, efficiency 27/32, xác suất bỏ lỡ 7/32 (7/16 có điều kiện) | **Đã xác minh** (3 nguồn: Claude, reviewer model khác, Argon; Monte Carlo) | Tích phân giải tích + mô phỏng 20.000 lần |
+| Công thức đóng cho mọi k: `bid = k(1−k)/(2(1+k)) + v/(1+k)`, `ask = (1−k)/2 + c/(2−k)` | **Đã xác minh**: trùng `cs_linear_coeffs` ở k ∈ {0,1; 0,25; 0,5; 0,75; 0,9}; đây là suy ra độc lập lần thứ ba | `simulation/verify_closed_forms.py` (so với code) + test vét cạn phản ứng tối ưu |
+| Hệ số xấp xỉ lưới cũ (k = 0,25 và 0,75) lệch 0,015–0,04 | **Đã xác minh** (và đã sửa, commit `bc1ac42`) | So với dạng đóng |
+| Hiệu quả tiệm cận khi mọi người dùng cùng λ, k = 0,5: `1 − λ²/(4(3−λ)²)` = 1; 0,9979; 0,9900; 0,9722; 0,9375 theo λ = 0 … 1; tổng quát λ = 1: `1 − (1−k+k²)²/9` | **Đã xác minh bằng mô phỏng lớn**: n = 4000 cho 0,9981; 0,9901; 0,9720; 0,9355 (k = 0,5) và 0,9244 / 0,9254 so với dự đoán 0,9266 (k = 0,25 / 0,75); hội tụ từ dưới khi n tăng | Hiệu số < 0,003 ở n = 4000; phần hụt ở n nhỏ phù hợp với lập luận mất cân bằng khối lượng hai phía nhưng **chưa tách riêng nguyên nhân** |
+| Lập luận: chiến lược đơn điệu chung ⇒ thứ tự khớp không đổi, welfare chỉ phụ thuộc điểm cắt | Phù hợp reviewer model khác và số liệu B2 | Hai nguồn độc lập |
+| Định lý O(1/m²) của Rustichini–Satterthwaite–Williams áp dụng cho **giá chung**, không phải giá theo từng cặp | Phù hợp kết quả tìm kiếm (mô hình "price set to equate revealed demand and supply"); chưa đọc bài gốc | Cần đọc bài |
+| "Trong giá theo từng cặp, động cơ khai giá không suy giảm như O(1/m)" | **Giả thuyết**, chưa có chứng minh hay nguồn | Phải đo bằng thí nghiệm (ε-equilibrium); không trích như sự thật |
+| Cỡ mẫu hiệu dụng `m_eff = (Σq)²/Σq²`, `E[q²] = 858,5`, `m_eff ≈ 0,379·n`; độ lệch chuẩn chênh lệch khối lượng mua–bán ≈ 293 đơn vị ở n = 100 | Phần số học **đã kiểm** (phép tính trực tiếp) | Tính tay |
+| Khuyến nghị thiết kế: mẫu độc lập giữa các n, ≥ 5 mức n, 200–500 seed; số lệnh mua = số lệnh bán (stratified); bỏ làm tròn 0,01 khi đo tốc độ hội tụ; quy trình lặp phản ứng tối ưu có làm trơn và đo ε trên seed kiểm định riêng; kiểm tra lớp chiến lược phụ thuộc khối lượng | **Đề xuất hợp lý, chưa làm**; trùng một phần với reviewer (mẫu lồng nhau) | Thực hiện ở bước tiếp theo |
+| Nguồn: Ausubel và cs. (2014, *Review of Economic Studies* 81(4)); Bosshard và cs. (2020) "Management Science"; Chatterjee–Samuelson "Mục 3 và 4" | Ausubel: **đúng**. Bosshard: **sai nơi đăng**, bài thực là *Journal of Artificial Intelligence Research* 69 (2020). Số mục trong Chatterjee–Samuelson: **không kiểm chứng được** | Tìm kiếm web |
+| Các cách giải thích con số "1/6" của nguồn kia (thặng dư tối đa, thâm hụt Myerson–Satterthwaite, khoảng cách hệ số chặn, mức mất làm tròn) | **Suy đoán**, chưa kiểm chứng nguồn đó | Không trích 1/6 |
+
+Trạng thái các hệ quả (cập nhật 10/11): (i) mẫu độc lập giữa các m, một đơn vị mỗi lệnh: đã làm ở thí nghiệm C (chưa có nhiều đơn vị mỗi lệnh); (ii) nhánh giá chung của phiên: đã làm (`kda`, `marginal`); (iii) ε-equilibrium: đã làm sơ bộ, dùng phản ứng tối ưu từng điểm thay cho lớp bốn tham số vì cân bằng ở k = 1 không tuyến tính [SW89]; (iv) báo cáo ε chuẩn hóa: đã làm; kiểm quy trình tái tạo dạng đóng ở m = 1: đã làm (chế độ tuyến tính).
 
 ---
 
@@ -303,23 +399,32 @@ Bất biến (theo mục 10.1 của đề cương nội bộ, tài liệu ngoài
 - Khối lượng mua khớp = khối lượng bán khớp; không lệnh nào khớp vượt `amount` gốc.
 - `ask ≤ clearing_price ≤ bid` cho mọi cặp (kể cả sau làm tròn tick, §3.3).
 - Lệnh `FILLED/CANCELLED/EXPIRED` không xuất hiện lại ở phiên sau.
-- Không `trade_hash` nào được gửi hai lần; engine tự kiểm tra trước khi gửi để tránh tốn gas cho giao dịch revert [R12].
+- Không cặp khớp nào được gửi hai lần: engine dùng khóa idempotency `trade_hash` (§3.2) và đối chiếu `filledAmount` on-chain trước khi gửi, để tránh tốn gas cho giao dịch revert [R12]. **Giới hạn:** nếu [D] không chặn gửi trùng thì khóa idempotency chỉ bảo vệ phía engine (Đ15).
+- Mọi `clearingPrice` đưa lên chuỗi thỏa `ask ≤ clearingPrice ≤ bid` bằng số nguyên (nếu không, hợp đồng revert `PriceMismatch`).
 - Cùng snapshot → cùng kết quả.
 
-Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trống; bid < ask toàn bộ; bid = ask; nhiều lệnh cùng giá và tuổi (pro-rata + phần dư); lệnh khác tuổi cùng giá; partial fill; hủy sát cutoff; hết hạn; rollover nhiều phiên; trùng `order_id`; giá nhiều chữ số thập phân.
+Kịch bản test tối thiểu: phần lớn đã có trong `system_agents/matching_engine/test_session_engine.py` (sổ trống, một phía trống, bid < ask toàn bộ, bid = ask, pro-rata và phần dư, khác tuổi cùng giá, partial fill, trùng `order_id`, rollover nhiều phiên, IOC, hết hạn theo `max_rollover`). **Chưa viết:** hủy sát cutoff, đồng bộ `filledAmount` on-chain, giá nhiều chữ số thập phân ở lớp API.
 
 ---
 
 ## 11. Giới hạn và câu hỏi mở
 
 1. Độ dài phiên (cutoff).
-2. Tie-break mặc định: `age_prorata` hay `fifo`; có code pro-rata ở GĐ2 không.
-3. Giá theo cặp hay giá chung của phiên (§7).
+2. Tie-break mặc định: `age_prorata` (phần dư theo largest remainder, §5.2) hay `fifo`. Đề xuất: `age_prorata` (đã có cài đặt tham chiếu, §5.2).
+3. Giá theo cặp hay giá chung `kda` của phiên (§7). Đề xuất: `kda` (thí nghiệm C ở §9.5: `kda` không kém `pair` ở k = 0,5 và tốt hơn rõ ở k = 1).
 4. `max_rollover_count`/TTL cho lệnh GTC.
 5. Thiết kế thí nghiệm B: chiến lược khai giá nào (ZIP hay hàm shading theo k), kiểm tra hệ số Chatterjee–Samuelson với bài gốc, và chỉnh lại câu chữ nhiệm vụ trên Google Doc.
-6. Tick giá và quy tắc làm tròn; quy đổi sang `uint256` on-chain (phối hợp với Đức).
-7. Thanh toán tiền trong `settleMatchedTrade` (§8.4, ý 1) và xác minh chữ ký/giá on-chain (§8.4, ý 2).
-8. Quản lý khóa của `matchingAgentAddress` và phương án khi tác tử ngừng hoạt động.
+6. **Đơn vị `amount`: kg CO2e hay tCO2e** (mâu thuẫn giữa [D] và báo cáo GĐ1; §3.3), cần chốt với Đức.
+7. Hướng làm tròn giá khớp nguyên (đề xuất `half_even`, §3.3) và đơn vị `pricePerUnit` (wei của token thanh toán nào, bao nhiêu chữ số thập phân).
+8. `time_in_force` có đưa vào struct được ký không (§6.1).
+9. Ngữ nghĩa `nonce`/`incrementNonce` của [D]: tăng nonce vô hiệu hóa mọi lệnh cũ hay từng lệnh; ảnh hưởng tới lệnh GTC đang nằm trong sổ.
+10. Cập nhật `contracts/` theo [D] (hiện `main` chưa có bước thanh toán và xác minh chữ ký on-chain) và thứ tự merge branch của Đức.
+11. Điểm cần Đức xác nhận trong [D] (xem `docs/VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md`): kiểm `filledAmount` chỉ nêu cho phía bid ở [D, §3.3, bước 3] (cần cả phía ask); ai được gọi `cancelOrder`; `matchAmount = 0` có bị từ chối không.
+12. Quản lý khóa của Settlement Submitter, quyền gọi `settleMatchedTrade`, và phương án khi tác tử ngừng hoạt động.
+13. Chống thao túng phần dư pro-rata và ưu tiên theo tuổi (§5.2): largest remainder còn hai lỗ hổng đã biết (tách lệnh, nghịch lý Alabama); biện pháp khả thi trên chuỗi là khối lượng đặt lệnh tối thiểu và biên độ giá, còn khóa tài sản khi đặt lệnh cần đổi mô hình non-custodial (§8.1, [D]); chưa chốt phương án (largest remainder, chia theo ước số, hay phá hòa ngẫu nhiên có seed công bố).
+14. Hợp đồng [D] có kiểm `deadline`, `nonce`, hủy lệnh, hai lệnh cùng `tokenId`, vai trò BID/ASK, người mua khác người bán, và `filledAmount` phía ask không (§6.1, §8.4; Đ2, Đ14).
+15. Công thức `tradeHash` tất định để engine tính trước và hợp đồng chặn gửi trùng một khớp (§3.2; Đ15).
+16. Phạm vi kết quả O(1/m²) của [RSW94] theo `k` và đối với giá theo từng cặp: chưa có nguồn gốc (§7); cần đọc toàn văn [RSW94] trước khi trích vào báo cáo chung.
 
 ---
 
@@ -327,11 +432,16 @@ Kịch bản test tối thiểu (chưa viết): sổ trống; một phía trốn
 
 Đánh số [R*] theo đề cương nội bộ của người phụ trách (tài liệu ngoài repo, chứa DOI và trạng thái truy cập toàn văn đầy đủ):
 
-- **[R3]** Budish, E., Cramton, P., & Shim, J. (2015). The High-Frequency Trading Arms Race: Frequent Batch Auctions as a Market Design Response. *Quarterly Journal of Economics*, 130(4), 1547–1621. — ưu tiên theo tuổi/pro-rata trong cùng batch (mục VII.A), carry-over giữa batch (§5, §6).
+- **[R3]** Budish, E., Cramton, P., & Shim, J. (2015). The High-Frequency Trading Arms Race: Frequent Batch Auctions as a Market Design Response. *Quarterly Journal of Economics*, 130(4), 1547–1621. — ưu tiên theo tuổi/pro-rata trong cùng batch (mục VII.A), carry-over giữa batch (§5, §6). Mức đã đọc chưa được ghi trong tài liệu này; xem đề cương nội bộ và ghi lại trước khi trích.
 - **[R4]** Chatterjee, K., & Samuelson, W. (1983). Bargaining under Incomplete Information. *Operations Research*, 31(5), 835–851. — k-double auction; cơ sở cho thí nghiệm B.
 - **[R1]** Liu, X., et al. (2026). Blockchain and double auction for credible and efficient voluntary carbon market. *Applied Energy*, 412, 127719. — bài trực tiếp về VCM; chi tiết rule và rollover **chưa đọc toàn văn**, không dùng làm căn cứ cho khẳng định cụ thể ở tài liệu này.
 - **[R9]** Daian, P., et al. (2020). Flash Boys 2.0. *IEEE S&P*, 910–927. — MEV (§8.4).
 - **[R12]** Ethereum.org, *Gas and fees* — chi phí giao dịch revert (§10).
+- **[D]** Nguyễn Hoàng Đức, *Tài liệu đặc tả kỹ thuật Smart Contract*, `docs/SMART_CONTRACT_SPEC.md`, bản v2, commit `3194bad` (06/11/2026), branch `docs/smart-contract-spec` (chưa merge vào `main` tại thời điểm viết). Nguồn nội bộ của nhóm, chưa được kiểm toán độc lập; các số liệu gas trong đó chưa được kiểm chứng.
+- **[SW89]** Satterthwaite, M. A., & Williams, S. R. (1989). The Rate of Convergence to Efficiency in the Buyer's Bid Double Auction as the Market Becomes Large. *Review of Economic Studies*, 56(4), 477–498. — **đã đọc toàn văn**: định nghĩa giá tại `s(m+1)`, người bán trung thực là chiến lược trội, khai lệch của người mua O(1/m), Bảng 6.1 (mất hiệu quả tương đối theo m) dùng để đối chiếu mô phỏng (§9.5).
+- **[RSW94]** Rustichini, A., Satterthwaite, M. A., & Williams, S. R. (1994). Convergence to Efficiency in a Simple Market with Incomplete Information. *Econometrica*, 62(5), 1041–1063. — **chỉ đọc tóm tắt** trên trang tạp chí (giá đặt để cân bằng cung–cầu đã khai; khai lệch O(1/m), mất hiệu quả O(1/m²) ở mọi cân bằng); phạm vi theo `k` chưa kiểm chứng.
+- **[W85]** Wilson, R. (1985). Incentive Efficiency of Double Auctions. *Econometrica*, 53(5), 1101–1115. — chưa đọc (sau paywall); chưa kiểm chứng quy tắc giá cụ thể; không được trích trong thân spec, chỉ để tham khảo.
+- **[CS06]** Cripps, M. W., & Swinkels, J. M. (2006). Efficiency of Large Double Auctions. *Econometrica*, 74(1), 47–92. — chỉ đọc tóm tắt; các nguồn tóm tắt ghi tốc độ không thống nhất (1/n hoặc n^(−2α)), **không trích số mũ**. Không được trích trong thân spec, chỉ để tham khảo.
 - **[R7]** Myerson, R. B., & Satterthwaite, M. A. (1983). Efficient Mechanisms for Bilateral Trading. *Journal of Economic Theory*, 29(2), 265–281.
 
 Nguồn web bổ sung (truy cập 02/11/2026), đánh dấu mức độ tin cậy:

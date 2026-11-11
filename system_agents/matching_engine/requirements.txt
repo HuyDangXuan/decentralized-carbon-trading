@@ -1,0 +1,6 @@
+# Matching Engine (Python 3.12). Lõi khớp lệnh (session_engine.py, auction_agent.py) chỉ dùng thư viện chuẩn;
+# các gói dưới đây chỉ cần cho API Service (api_service.py). Phiên bản đã kiểm bằng test ngày 10/11/2026.
+fastapi==0.162.2
+uvicorn==0.54.0
+eth-account==0.14.0
+httpx==0.28.1   # chỉ cho test (TestClient của Starlette)

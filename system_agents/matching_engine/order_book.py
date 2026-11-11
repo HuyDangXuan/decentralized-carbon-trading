@@ -14,9 +14,13 @@ class Order:
     order_type: OrderType
     token_id: int        # ID của lô tín chỉ carbon (ERC-1155)
     amount: int          # Khối lượng tín chỉ (tấn CO2 tương đương - tCO2e)
-    price: float         # Giá đặt mua tối đa hoặc giá chào bán tối thiểu (USD hoặc Token thanh toán)
+    # Giá đặt mua tối đa hoặc giá chào bán tối thiểu. Với `DoubleAuctionAgent` (ADR-001) phải là
+    # số nguyên micro-USDC mỗi tCO2e; baseline mô phỏng cũ vẫn dùng số thực USD.
+    price: float
     timestamp: float = field(default_factory=time.time)
     signature: Optional[str] = None  # Chữ ký số EIP-712 xác thực từ ví người dùng
+    time_in_force: str = "GTC"       # "GTC" | "IOC" (ADR-001, Quyết định 4)
+    deadline: Optional[int] = None   # Unix time hết hạn chữ ký (giây); None = không giới hạn
 
 @dataclass
 class MatchResult:
@@ -24,5 +28,6 @@ class MatchResult:
     ask_order_id: str
     token_id: int
     amount: int
-    clearing_price: float
+    clearing_price: float  # DoubleAuctionAgent: số nguyên micro-USDC mỗi tCO2e
     timestamp: float = field(default_factory=time.time)
+    session_id: Optional[int] = None
