@@ -11,15 +11,17 @@
 
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  ProviderNotFoundError,
   useAccount,
   useBalance,
+  useConfig,
   useConnect,
   useDisconnect,
   useSwitchChain,
-  useChainId,
 } from "wagmi";
+import { ResourceUnavailableRpcError, UserRejectedRequestError } from "viem";
 import { DEFAULT_CHAIN, CHAIN_DISPLAY_NAMES } from "../web3/config";
 
 /** Trạng thái kết nối ví trả về cho UI */
@@ -62,12 +64,15 @@ export interface WalletActions {
 
 export function useWalletConnection(): WalletState & WalletActions {
   // --- Wagmi hooks ---
-  const { address, isConnected, isConnecting, isDisconnected, chain } = useAccount();
-  const chainId = useChainId();
+  const { address, isConnected, isConnecting, chain } = useAccount();
+  const config = useConfig();
   const { data: balanceData } = useBalance({ address });
-  const { connect: wagmiConnect, connectors, error: connectError } = useConnect();
+  const { connectAsync } = useConnect();
   const { disconnect: wagmiDisconnect, isPending: isDisconnecting } = useDisconnect();
   const { switchChain: wagmiSwitchChain } = useSwitchChain();
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+  const [connectError, setConnectError] = useState<Error | null>(null);
+  const connectionInProgress = useRef(false);
 
   // --- Derived state ---
   const shortAddress = useMemo(() => {
@@ -96,17 +101,36 @@ export function useWalletConnection(): WalletState & WalletActions {
   const nativeSymbol = balanceData?.symbol ?? "ETH";
 
   // --- Actions ---
-  const connect = useCallback(() => {
-    // Tìm MetaMask connector (injected)
-    const metaMaskConnector = connectors.find(
-      (c) => c.id === "injected" || c.name === "MetaMask"
-    );
-    if (metaMaskConnector) {
-      wagmiConnect({ connector: metaMaskConnector });
-    } else if (connectors.length > 0) {
-      wagmiConnect({ connector: connectors[0] });
+  const connect = useCallback(async () => {
+    if (connectionInProgress.current) return;
+    connectionInProgress.current = true;
+    setIsConnectingWallet(true);
+    setConnectError(null);
+    try {
+      // Prefer EIP-6963 discovery when another wallet owns window.ethereum.
+      for (const id of ["io.metamask", "metaMask"]) {
+        const connector = config.connectors.find((candidate) => candidate.id === id);
+        if (!connector || !(await connector.getProvider())) continue;
+        await connectAsync({ connector });
+        return;
+      }
+      throw new ProviderNotFoundError();
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+      if (error instanceof ProviderNotFoundError) {
+        setConnectError(error);
+      } else if (code === UserRejectedRequestError.code) {
+        setConnectError(new Error("Bạn đã hủy yêu cầu kết nối. Bấm nút kết nối để thử lại."));
+      } else if (code === ResourceUnavailableRpcError.code) {
+        setConnectError(new Error("Mở tiện ích MetaMask để xử lý yêu cầu kết nối đang chờ."));
+      } else {
+        setConnectError(new Error("Kết nối thất bại. Mở khóa MetaMask rồi thử lại."));
+      }
+    } finally {
+      connectionInProgress.current = false;
+      setIsConnectingWallet(false);
     }
-  }, [connectors, wagmiConnect]);
+  }, [config, connectAsync]);
 
   const disconnect = useCallback(() => {
     wagmiDisconnect();
@@ -126,7 +150,7 @@ export function useWalletConnection(): WalletState & WalletActions {
   return {
     // State
     isConnected,
-    isConnecting,
+    isConnecting: isConnecting || isConnectingWallet,
     isDisconnecting,
     address,
     shortAddress,
@@ -135,7 +159,7 @@ export function useWalletConnection(): WalletState & WalletActions {
     isCorrectChain,
     nativeBalance,
     nativeSymbol,
-    error: connectError ?? null,
+    error: connectError,
 
     // Actions
     connect,
