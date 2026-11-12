@@ -11,14 +11,14 @@
 
 ### DANH SÁCH NHIỆM VỤ CẦN THỰC HIỆN
 
-#### 🔲 Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
+#### ✅ Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
 * **Hạn chót:** **15/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Hoàn thành`
 * **Mô tả công việc:**
   1. Nhận địa chỉ 3 hợp đồng (`MockUSDC`, `CarbonCredit1155`, `CarbonDoubleAuction`) từ tệp `docs/DEPLOYED_ADDRESSES.md` của Đức.
   2. Tạo/cập nhật file `frontend/.env.local`:
      ```env
-     NEXT_PUBLIC_AMOY_RPC_URL="https://rpc-amoy.polygon.technology"
+     NEXT_PUBLIC_AMOY_RPC_URL="https://polygon-amoy.gateway.tenderly.co"
      NEXT_PUBLIC_CARBON_AUCTION_ADDRESS="0x..."
      NEXT_PUBLIC_CARBON_CREDIT_ADDRESS="0x..."
      NEXT_PUBLIC_MOCK_USDC_ADDRESS="0x..."
@@ -87,5 +87,5 @@
 
 - **12/11/2026 · T.1** Đã cấu hình ba địa chỉ Polygon Amoy và bổ sung hiển thị số dư EVCC theo token ID cùng MockUSDC theo địa chỉ ví. Số dư MockUSDC dùng 6 chữ số thập phân.
 - **Kiểm tra** 14 bài kiểm thử frontend, 10 bài kiểm thử metadata, TypeScript, lint và production build đều đạt. Chrome dùng đầu nối ví giả lập với RPC Amoy thật hiển thị 0 EVCC cho token 101 và 10.000.000 MockUSDC, khớp kết quả đọc độc lập tại block 52674033 của ví triển khai công khai.
-- **Nghiệm thu còn lại** Kết nối MetaMask thật trên Polygon Amoy và đối chiếu số dư của tài khoản đang kết nối. T.1 giữ trạng thái chờ xác nhận lượt kiểm tra này.
 - **Lỗi kết nối MetaMask** Ưu tiên MetaMask do trình duyệt công bố qua EIP-6963, hỗ trợ cách phát hiện cũ và hướng dẫn mở đúng trình duyệt khi không có tiện ích. Đã kiểm tra trường hợp có ví khác, thiếu MetaMask và hủy yêu cầu kết nối. Hai số dư vẫn khớp với RPC Amoy khi dùng đầu nối giả lập.
+- **Nghiệm thu T.1** Chrome kết nối tiện ích MetaMask thật trên Polygon Amoy (chain ID 80002). Sau khi đổi RPC mặc định của DApp sang Tenderly, bảng điều khiển hiển thị **0 EVCC (token #101)** và **0 MockUSDC**. Kết quả khớp với hai lệnh `balanceOf` đọc độc lập tại block `52676023`; MockUSDC có 6 chữ số thập phân. Không cần ký hoặc gửi giao dịch để đối chiếu.
