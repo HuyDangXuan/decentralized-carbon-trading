@@ -13,7 +13,7 @@
 
 #### 🔲 Task Đ.1: Cài đặt môi trường `npm install` & Chạy Local Test Hardhat
 * **Hạn chót:** **12/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã hoàn thành (14/14 Test Cases PASS 100%, gas đạt 67,750 gas/lệnh < 85k chuẩn NFR-02)`
 * **Mô tả công việc:**
   1. Cài đặt các thư viện phụ thuộc bằng lệnh: `npm install` tại thư mục gốc của repository.
   2. Biên dịch hợp đồng: `npx hardhat compile` (đảm bảo không còn warning nghiêm trọng).
@@ -25,7 +25,7 @@
 
 #### 🔲 Task Đ.2: Cấu hình & Deploy 3 Hợp đồng lên Polygon Amoy Testnet
 * **Hạn chót:** **14/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã hoàn thành (12/11/2026 - Deploy thành công 3 hợp đồng, vượt tiến độ 2 ngày)`
 * **Mô tả công việc:**
   1. Chuẩn bị ví MetaMask có sẵn token POL mạng Amoy Testnet (nhận từ faucet https://faucet.polygon.technology/).
   2. Cấu hình biến môi trường trong file `.env`: `AMOY_RPC_URL`, `PRIVATE_KEY`, `POLYGONSCAN_API_KEY`.
@@ -36,15 +36,15 @@
   4. Xác minh (verify) mã nguồn 3 hợp đồng trên PolygonScan Amoy.
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Cả 3 hợp đồng sau được deploy thành công và hiển thị trạng thái Contract Verified trên PolygonScan:
-    1. `MockUSDC.sol` (6 decimals).
-    2. `CarbonCredit1155.sol` (Packed storage, Buffer pool).
-    3. `CarbonDoubleAuction.sol` (EIP-712 settlement).
+    1. `MockUSDC.sol` (6 decimals): `0xe35681b0882d533458d22B344268642136ebD813`
+    2. `CarbonCredit1155.sol` (Packed storage, Buffer pool): `0x851978601b47a61B8aF3bcC1707B689Fbc977697`
+    3. `CarbonDoubleAuction.sol` (EIP-712 settlement): `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`
 
 ---
 
 #### 🔲 Task Đ.3: Biên soạn Tài liệu Địa chỉ Hợp đồng `docs/DEPLOYED_ADDRESSES.md`
 * **Hạn chót:** **14/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã hoàn thành (12/11/2026 - Tạo tệp docs/DEPLOYED_ADDRESSES.md bàn giao Thắng & Phi)`
 * **Mô tả công việc:**
   Tạo tệp mới `docs/DEPLOYED_ADDRESSES.md` lưu trữ thông tin triển khai chính thức gồm:
   - Bảng địa chỉ 3 hợp đồng trên Polygon Amoy Testnet kèm đường link trực tiếp trên PolygonScan.
@@ -57,7 +57,7 @@
 
 #### 🔲 Task Đ.4: Đo lường & Cập nhật Benchmark Gas Thực tế trên Polygon Amoy
 * **Hạn chót:** **16/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [ ] Đang thực hiện`
 * **Mô tả công việc:**
   1. Chạy các giao dịch thực tế trên Polygon Amoy để đo lường chính xác lượng gas tiêu thụ:
      * Chi phí gas khi mint 1 lô tín chỉ carbon (`CarbonCredit1155.sol`).
@@ -74,7 +74,9 @@
 *(Đức hãy ghi chú các khó khăn, lỗi gặp phải hoặc tiến độ hàng ngày vào phần này rồi commit lên Git)*
 
 ```markdown
-- Ngày ...:
-- Tiến độ:
-- Vấn đề phát sinh (nếu có):
+- Ngày 12/11/2026:
+  - Hoàn thành Task Đ.1: 14/14 test cases PASS 100%, gas batch settlement đạt 67,750 gas/cặp lệnh (< 85,000 gas chuẩn NFR-02).
+  - Hoàn thành Task Đ.2: Cấu hình ví MetaMask thành công, nhận 1.0 POL faucet và deploy thành công cả 3 hợp đồng lên mạng Polygon Amoy Testnet (vượt tiến độ 2 ngày so với deadline 14/11).
+  - Hoàn thành Task Đ.3: Biên soạn xong tệp docs/DEPLOYED_ADDRESSES.md chứa toàn bộ địa chỉ contract, cấu hình RPC và hướng dẫn tích hợp chi tiết bàn giao cho Thắng (Frontend) và Phi (Matching Bot).
+  - Chuẩn bị Task Đ.4: Chạy benchmark gas thực nghiệm on-chain lấy TxHash thật trên Polygon Amoy.
 ```
