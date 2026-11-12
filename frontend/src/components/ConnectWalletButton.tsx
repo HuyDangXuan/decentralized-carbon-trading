@@ -7,6 +7,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ProviderNotFoundError } from "wagmi";
 import { useWalletConnection } from "../hooks/useWalletConnection";
 
 export function ConnectWalletButton() {
@@ -55,9 +56,22 @@ export function ConnectWalletButton() {
           {isConnecting ? "Đang kết nối..." : "Kết nối MetaMask"}
         </button>
 
-        {error && (
-          <p className="text-xs text-red-500 max-w-[280px] text-right">
-            ⚠️ {error.message.length > 100 ? error.message.slice(0, 100) + "..." : error.message}
+        {error instanceof ProviderNotFoundError ? (
+          <div role="alert" className="max-w-xs space-y-1 text-right text-xs text-amber-300">
+            <p className="font-semibold">Chưa tìm thấy MetaMask trong tab này.</p>
+            <p>Mở trang trong Chrome hoặc Edge có bật tiện ích MetaMask. Cho phép tiện ích truy cập trang này rồi tải lại.</p>
+            <a
+              href="https://support.metamask.io/hc/en-us/articles/360015489531"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2"
+            >
+              Hướng dẫn cài MetaMask
+            </a>
+          </div>
+        ) : error && (
+          <p role="alert" className="text-xs text-red-300 max-w-[280px] text-right">
+            {error.message}
           </p>
         )}
       </div>
