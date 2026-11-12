@@ -29,7 +29,7 @@ export const wagmiConfig = createConfig({
      *   http("https://polygon-amoy.g.alchemy.com/v2/YOUR_KEY")
      *   http("https://sepolia.infura.io/v3/YOUR_KEY")
      */
-    [polygonAmoy.id]: http(),
+    [polygonAmoy.id]: http(process.env.NEXT_PUBLIC_AMOY_RPC_URL || undefined),
     [sepolia.id]: http(),
   },
 });

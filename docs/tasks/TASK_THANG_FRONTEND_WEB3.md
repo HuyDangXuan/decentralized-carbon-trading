@@ -84,3 +84,7 @@
 - Tiến độ:
 - Vấn đề phát sinh (nếu có):
 ```
+
+- **12/11/2026 · T.1** Đã cấu hình ba địa chỉ Polygon Amoy và bổ sung hiển thị số dư EVCC theo token ID cùng MockUSDC theo địa chỉ ví. Số dư MockUSDC dùng 6 chữ số thập phân.
+- **Kiểm tra** 14 bài kiểm thử frontend, 10 bài kiểm thử metadata, TypeScript, lint và production build đều đạt. Chrome dùng đầu nối ví giả lập với RPC Amoy thật hiển thị 0 EVCC cho token 101 và 10.000.000 MockUSDC, khớp kết quả đọc độc lập tại block 52674033 của ví triển khai công khai.
+- **Nghiệm thu còn lại** Kết nối MetaMask thật trên Polygon Amoy và đối chiếu số dư của tài khoản đang kết nối. T.1 giữ trạng thái chờ xác nhận lượt kiểm tra này.

@@ -11,6 +11,7 @@ import { useAccount } from "wagmi";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { CreditBalanceCard } from "@/components/CreditBalanceCard";
+import { MockUsdcBalanceCard } from "@/components/MockUsdcBalanceCard";
 import { TradingFloor } from "@/components/TradingFloor";
 import { parseTokenId } from "@/lib/orders";
 
@@ -88,8 +89,9 @@ export default function HomePage() {
 
             {/* Token ID Input */}
             <div className="flex items-center gap-3 mb-6">
-              <label className="text-sm text-gray-400">Token ID:</label>
+              <label htmlFor="credit-token-id" className="text-sm text-gray-400">Token ID:</label>
               <input
+                id="credit-token-id"
                 type="number"
                 value={tokenIdInput}
                 onChange={(e) => setTokenIdInput(e.target.value)}
@@ -103,8 +105,14 @@ export default function HomePage() {
               />
             </div>
 
-            {/* Credit Balance Card */}
-            {validTokenId !== undefined ? <CreditBalanceCard tokenId={validTokenId} /> : <p role="alert" className="text-sm text-red-300">Token ID phải là số nguyên uint256.</p>}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {validTokenId !== undefined ? (
+                <CreditBalanceCard tokenId={validTokenId} />
+              ) : (
+                <p role="alert" className="text-sm text-red-300">Token ID phải là số nguyên uint256.</p>
+              )}
+              <MockUsdcBalanceCard />
+            </div>
           </div>
         )}
         {validTokenId !== undefined && <TradingFloor tokenId={validTokenId.toString()} />}
