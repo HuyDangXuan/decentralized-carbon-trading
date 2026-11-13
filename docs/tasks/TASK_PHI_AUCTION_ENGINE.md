@@ -76,7 +76,7 @@
 - Ngày 13/11/2026:
 - Tiến độ:
   - P.1: `settlement_submitter.py` đã xong và chạy thật trên node Hardhat cục bộ (chainId 80002) bằng `system_agents/matching_engine/e2e_hardhat/run_e2e.py`: batch 2 trade SETTLED, nộp lại bị bỏ qua, trade thiếu allowance bị phát hiện FAILED. Thêm 22 test (tổng 69 test ở matching_engine). CHƯA chạy trên Amoy: cần ví Operator có POL và được Đức cấp SETTLEMENT_OPERATOR_ROLE (hướng dẫn: docs/SETTLEMENT_SUBMITTER_GUIDE.md).
-  - P.2: đã có bộ kiểm chéo độc lập `simulation/equilibrium_crosscheck.py` (13 test). Ở m=2 và m=4 nó xếp nghiệm của find_equilibrium vào loại cân bằng xấp xỉ (exploitability 0,002-0,005; khai thật là 0,036-0,071). Các lần chạy m=32, m=64 và kịch bản nhiều đơn vị đang chạy, chưa có kết quả.
+  - P.2: đã có bộ kiểm chéo độc lập `simulation/equilibrium_crosscheck.py` (13 test). Ở m=2 và m=4 nó xếp nghiệm của find_equilibrium vào loại cân bằng xấp xỉ (exploitability 0,002-0,005; khai thật là 0,036-0,071). Các lần chạy m=32, m=64, kịch bản nhiều đơn vị, biểu đồ log-log và mục 9.5 của spec: chưa làm (để sau).
   - P.3: docs/THREAT_MODELING.md là bản nháp; mỗi biện pháp "đã có trong mã" đã đối chiếu file:dòng; chưa có review độc lập.
   - P.4: chưa làm, cần hai bài báo gốc.
 - Vấn đề phát sinh (nếu có):
