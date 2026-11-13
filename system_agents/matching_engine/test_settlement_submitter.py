@@ -90,8 +90,22 @@ class FakeChain:
         self._executed, self._cancelled = set(), set()
         self._filled: Dict[bytes, int] = {}
         self._nonces: Dict[str, int] = {}
+        # Mặc định mọi bên đủ tiền, đủ tín chỉ, đã cấp quyền và không có mã; từng test ghi đè theo địa chỉ viết thường.
+        self._code: set = set()
+        self._pay_balance: Dict[str, int] = {}
+        self._pay_allowance: Dict[str, int] = {}
+        self._carbon_balance: Dict[str, int] = {}
+        self._not_approved: set = set()
+        self.reads: Dict[str, int] = {}  # đếm số lần đọc theo hàm, để kiểm bộ nhớ đệm
         self.submitted_batches: List[List[Tuple[Any, ...]]] = []
         self.hook: Optional[Callable[[List[Tuple[Any, ...]]], BatchReceipt]] = None
+
+    def _count(self, name: str) -> None: self.reads[name] = self.reads.get(name, 0) + 1
+    def has_code(self, a: str) -> bool: self._count("code"); return a.lower() in self._code
+    def payment_balance(self, o: str) -> int: self._count("pbal"); return self._pay_balance.get(o.lower(), 10**30)
+    def payment_allowance(self, o: str) -> int: self._count("pall"); return self._pay_allowance.get(o.lower(), 10**30)
+    def carbon_balance(self, o: str, tid: int) -> int: self._count("cbal"); return self._carbon_balance.get(o.lower(), 10**30)
+    def carbon_approved(self, o: str) -> bool: self._count("capp"); return o.lower() not in self._not_approved
 
     def now(self) -> int: return self._now
     def is_paused(self) -> bool: return self._paused
@@ -244,6 +258,99 @@ class TestSubmitterPrecheck(unittest.TestCase):
         self.chain._paused = True
         with self.assertRaises(SettlementError):
             self.submitter.precheck([t1])
+
+
+class TestFundsAndContractTraders(unittest.TestCase):
+    """Kiểm trước các điều kiện mà hợp đồng chỉ phát hiện khi chuyển token: mã của bên mua, số dư, allowance."""
+
+    def setUp(self):
+        self.chain = FakeChain()
+        self.alice, self.bob = ACCT_ALICE.address.lower(), ACCT_BOB.address.lower()  # alice mua, bob bán
+        self.submitter = SettlementSubmitter(self.chain, verify_signatures=False)
+
+    def run_one(self, submitter=None, **kw):
+        acc, sk = (submitter or self.submitter).precheck([prepare_trade(make_payload(**kw))])
+        return len(acc), [o.reason for o in sk]
+
+    def test_buyer_with_code_is_skipped_unless_allowed(self):
+        self.chain._code.add(self.alice)
+        n, reasons = self.run_one()
+        self.assertEqual(n, 0)
+        self.assertIn("contract code", reasons[0])
+        allowed = SettlementSubmitter(self.chain, verify_signatures=False, allow_contract_traders=True)
+        self.assertEqual(self.run_one(allowed)[0], 1)
+
+    def test_seller_code_is_not_a_reason_to_skip(self):
+        self.chain._code.add(self.bob)  # người bán chỉ nhận ERC-20, không có hook
+        self.assertEqual(self.run_one()[0], 1)
+
+    def test_buyer_balance_and_allowance(self):
+        need = 50 * 11_000_000
+        self.chain._pay_balance[self.alice] = need - 1
+        n, reasons = self.run_one()
+        self.assertEqual(n, 0)
+        self.assertIn("balance", reasons[0])
+        self.chain._pay_balance[self.alice] = need  # vừa đủ thì được nhận
+        self.assertEqual(self.run_one()[0], 1)
+        self.chain._pay_allowance[self.alice] = need - 1
+        n, reasons = self.run_one()
+        self.assertEqual(n, 0)
+        self.assertIn("allowance", reasons[0])
+
+    def test_seller_carbon_balance_and_approval(self):
+        self.chain._carbon_balance[self.bob] = 49
+        n, reasons = self.run_one()
+        self.assertEqual(n, 0)
+        self.assertIn("carbon balance", reasons[0])
+        self.chain._carbon_balance[self.bob] = 50
+        self.assertEqual(self.run_one()[0], 1)
+        self.chain._not_approved.add(self.bob)
+        n, reasons = self.run_one()
+        self.assertEqual(n, 0)
+        self.assertIn("setApprovalForAll", reasons[0])
+
+    def test_funds_are_cumulative_within_a_batch(self):
+        # Hai trade cùng bên mua: số dư chỉ đủ cho trade đầu, trade sau phải bị bỏ.
+        self.chain._pay_balance[self.alice] = 60 * 11_000_000
+        t1 = prepare_trade(make_payload(amount=40, bid_amt=100, ask_oid="0x" + "03" * 32))
+        t2 = prepare_trade(make_payload(amount=40, bid_amt=100, ask_oid="0x" + "04" * 32))
+        acc, sk = self.submitter.precheck([t1, t2])
+        self.assertEqual((len(acc), len(sk)), (1, 1))
+        self.assertIn("balance", sk[0].reason)
+        # Người bán cũng cộng dồn tín chỉ.
+        self.chain._pay_balance.clear()
+        self.chain._carbon_balance[self.bob] = 70
+        acc, sk = self.submitter.precheck([t1, t2])
+        self.assertEqual((len(acc), len(sk)), (1, 1))
+        self.assertIn("carbon balance", sk[0].reason)
+
+    def test_skipped_trade_does_not_consume_funds(self):
+        # Trade đầu bị bỏ vì lý do khác (hết hạn) nên không được trừ vào số dư của trade sau.
+        self.chain._pay_balance[self.alice] = 50 * 11_000_000
+        t_bad = prepare_trade(make_payload(deadline=500, ask_oid="0x" + "03" * 32))
+        t_ok = prepare_trade(make_payload(ask_oid="0x" + "04" * 32))
+        acc, sk = self.submitter.precheck([t_bad, t_ok])
+        self.assertEqual((len(acc), len(sk)), (1, 1))
+        self.assertIn("deadline", sk[0].reason)
+
+    def test_no_funds_check_keeps_code_check_and_sends_underfunded_trade(self):
+        self.chain._pay_balance[self.alice] = 0
+        s = SettlementSubmitter(self.chain, verify_signatures=False, check_funds=False)
+        self.assertEqual(self.run_one(s)[0], 1)
+        self.chain._code.add(self.alice)
+        self.assertEqual(self.run_one(s)[0], 0)
+
+    def test_chain_reads_are_cached_within_one_precheck(self):
+        trades = [prepare_trade(make_payload(amount=10, bid_amt=100, ask_oid="0x" + f"{i:02x}" * 32)) for i in range(3, 6)]
+        acc, _ = self.submitter.precheck(trades)
+        self.assertEqual(len(acc), 3)
+        self.assertEqual({k: v for k, v in self.chain.reads.items()}, {"code": 1, "pbal": 1, "pall": 1, "cbal": 1, "capp": 1})
+
+    def test_settle_does_not_send_a_skipped_trade(self):
+        self.chain._pay_balance[self.alice] = 0
+        report = self.submitter.settle([make_payload()])
+        self.assertEqual(self.chain.submitted_batches, [])
+        self.assertEqual(report.count(TradeStatus.SKIPPED), 1)
 
 
 class TestSignatureVerification(unittest.TestCase):

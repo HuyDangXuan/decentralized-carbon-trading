@@ -38,6 +38,16 @@ DOMAIN_NAME = "EPU Carbon Double Auction"
 DOMAIN_VERSION = "2.0"
 MAX_BATCH_SIZE = 20  # Đức đo tới 20 cặp lệnh/batch (~2,74 triệu gas); không đo lớn hơn
 ABI_PATH = Path(__file__).resolve().parents[2] / "contracts" / "abis" / "CarbonDoubleAuction.json"
+
+
+def _view(name: str, inputs: List[str], output: str) -> Dict[str, Any]:
+    return {"name": name, "type": "function", "stateMutability": "view",
+            "inputs": [{"name": f"a{i}", "type": t} for i, t in enumerate(inputs)], "outputs": [{"name": "", "type": output}]}
+
+
+# ABI tối thiểu của hai token mà hợp đồng đấu giá chuyển (địa chỉ lấy từ paymentToken() và carbonToken()).
+_ERC20_ABI = [_view("balanceOf", ["address"], "uint256"), _view("allowance", ["address", "address"], "uint256")]
+_ERC1155_ABI = [_view("balanceOf", ["address", "uint256"], "uint256"), _view("isApprovedForAll", ["address", "address"], "bool")]
 KEY_ENV = "SETTLEMENT_OPERATOR_PRIVATE_KEY"
 
 UINT128_MAX = 2**128 - 1
@@ -282,6 +292,11 @@ class ChainClient(Protocol):
     def filled(self, order_id: bytes) -> int: ...
     def cancelled(self, order_id: bytes) -> bool: ...
     def user_nonce(self, trader: str) -> int: ...
+    def has_code(self, address: str) -> bool: ...
+    def payment_balance(self, owner: str) -> int: ...
+    def payment_allowance(self, owner: str) -> int: ...
+    def carbon_balance(self, owner: str, token_id: int) -> int: ...
+    def carbon_approved(self, owner: str) -> bool: ...
     def submit_batch(self, structs: List[Tuple[Any, ...]]) -> BatchReceipt: ...
 
 
@@ -296,6 +311,8 @@ class Web3Chain:
         self.gas_multiplier = gas_multiplier
         self.min_priority_fee = min_priority_fee_gwei * 10**9  # Amoy yêu cầu tối thiểu ~25 gwei
         self.receipt_timeout = receipt_timeout
+        self._payment: Any = None  # hợp đồng token thanh toán và tín chỉ, dựng khi cần
+        self._carbon: Any = None
 
     @classmethod
     def from_rpc(cls, rpc_url: str, contract_address: str, private_key: str,
@@ -330,6 +347,28 @@ class Web3Chain:
 
     def user_nonce(self, trader: str) -> int:
         return int(self.contract.functions.userNonces(trader).call())
+
+    def has_code(self, address: str) -> bool:
+        """Địa chỉ có mã (hợp đồng, hoặc EOA ủy quyền mã theo EIP-7702): hook ERC-1155 của nó có thể chạy."""
+        return len(self.w3.eth.get_code(to_checksum_address(address))) > 0
+
+    def _tokens(self) -> Tuple[Any, Any]:
+        if self._payment is None:
+            self._payment = self.w3.eth.contract(address=self.contract.functions.paymentToken().call(), abi=_ERC20_ABI)
+            self._carbon = self.w3.eth.contract(address=self.contract.functions.carbonToken().call(), abi=_ERC1155_ABI)
+        return self._payment, self._carbon
+
+    def payment_balance(self, owner: str) -> int:
+        return int(self._tokens()[0].functions.balanceOf(to_checksum_address(owner)).call())
+
+    def payment_allowance(self, owner: str) -> int:
+        return int(self._tokens()[0].functions.allowance(to_checksum_address(owner), self.contract.address).call())
+
+    def carbon_balance(self, owner: str, token_id: int) -> int:
+        return int(self._tokens()[1].functions.balanceOf(to_checksum_address(owner), token_id).call())
+
+    def carbon_approved(self, owner: str) -> bool:
+        return bool(self._tokens()[1].functions.isApprovedForAll(to_checksum_address(owner), self.contract.address).call())
 
     # --- ghi
     def submit_batch(self, structs: List[Tuple[Any, ...]]) -> BatchReceipt:
@@ -416,7 +455,7 @@ OnSettled = Callable[[PreparedTrade, TradeOutcome], None]
 
 class SettlementSubmitter:
     def __init__(self, chain: ChainClient, batch_size: int = MAX_BATCH_SIZE, verify_signatures: bool = True,
-                 deadline_margin: int = 60):
+                 deadline_margin: int = 60, check_funds: bool = True, allow_contract_traders: bool = False):
         if not 1 <= batch_size <= MAX_BATCH_SIZE:
             raise ValueError(f"batch_size must be in [1, {MAX_BATCH_SIZE}]")
         if deadline_margin < 0:
@@ -425,6 +464,10 @@ class SettlementSubmitter:
         self.batch_size = batch_size
         self.verify_signatures = verify_signatures
         self.deadline_margin = deadline_margin  # giây: trade sắp hết hạn có thể hết hạn trước khi block được đào
+        self.check_funds = check_funds  # kiểm số dư và allowance trước khi gửi (tắt chỉ để thử đường FAILED)
+        # Bên mua có mã (hợp đồng hoặc EOA ủy quyền EIP-7702) có thể đốt gas trong hook onERC1155Received
+        # (xem docs/THREAT_MODELING.md mục 5.5); mặc định bỏ qua trade của họ.
+        self.allow_contract_traders = allow_contract_traders
 
     def precheck(self, trades: Sequence[PreparedTrade]) -> Tuple[List[PreparedTrade], List[TradeOutcome]]:
         """Mô phỏng các chốt chặn của hợp đồng (theo thứ tự dòng 224-300) bằng lệnh đọc, không tốn gas."""
@@ -432,19 +475,53 @@ class SettlementSubmitter:
             raise SettlementError("contract is paused")
         now = self.chain.now()
         pending_fill: Dict[bytes, int] = {}
+        pending_pay: Dict[str, int] = {}  # tiền mỗi bên mua đã cam kết trong các trade được nhận trước đó
+        pending_carbon: Dict[Tuple[str, int], int] = {}  # tín chỉ mỗi bên bán đã cam kết
+        reads: Dict[Tuple[Any, ...], Any] = {}  # mỗi giá trị đọc từ chain chỉ đọc một lần trong một lần kiểm tra
         seen: set = set()
         accepted: List[PreparedTrade] = []
         skipped: List[TradeOutcome] = []
         for t in trades:
             reason = self._reject_reason(t, now, pending_fill, seen)
+            if reason is None and (self.check_funds or not self.allow_contract_traders):
+                reason = self._funds_reject_reason(t, pending_pay, pending_carbon, reads)
             if reason is None:
                 accepted.append(t)
                 seen.add(t.trade_hash)
                 for order in (t.bid, t.ask):
                     pending_fill[order[0]] = pending_fill.get(order[0], 0) + t.amount
+                buyer, seller, token = t.bid[1].lower(), t.ask[1].lower(), t.bid[3]
+                pending_pay[buyer] = pending_pay.get(buyer, 0) + t.amount * t.clearing_price
+                pending_carbon[(seller, token)] = pending_carbon.get((seller, token), 0) + t.amount
             else:
                 skipped.append(self._outcome(t, TradeStatus.SKIPPED, reason))
         return accepted, skipped
+
+    def _funds_reject_reason(self, t: PreparedTrade, pay: Dict[str, int], carbon: Dict[Tuple[str, int], int],
+                             reads: Dict[Tuple[Any, ...], Any]) -> Optional[str]:
+        """Kiểm điều kiện mà hợp đồng chỉ phát hiện khi chuyển token (dòng 321 và 324): mã của bên mua, số dư, allowance."""
+        def read(key: Tuple[Any, ...], fn: Callable[[], Any]) -> Any:
+            if key not in reads:
+                reads[key] = fn()
+            return reads[key]
+
+        buyer, seller, token = t.bid[1], t.ask[1], t.bid[3]
+        if not self.allow_contract_traders and read(("code", buyer.lower()), lambda: self.chain.has_code(buyer)):
+            return ("bid trader has contract code (contract wallet or EIP-7702): its ERC-1155 hook could burn the batch's gas; "
+                    "use --allow-contract-traders to accept")
+        if not self.check_funds:
+            return None
+        need_pay = pay.get(buyer.lower(), 0) + t.amount * t.clearing_price
+        if read(("pbal", buyer.lower()), lambda: self.chain.payment_balance(buyer)) < need_pay:
+            return f"buyer's payment-token balance is below the {need_pay} needed for this and earlier trades of the batch"
+        if read(("pall", buyer.lower()), lambda: self.chain.payment_allowance(buyer)) < need_pay:
+            return f"buyer's payment-token allowance to the auction contract is below the {need_pay} needed"
+        need_carbon = carbon.get((seller.lower(), token), 0) + t.amount
+        if read(("cbal", seller.lower(), token), lambda: self.chain.carbon_balance(seller, token)) < need_carbon:
+            return f"seller's carbon balance (token {token}) is below the {need_carbon} needed for this and earlier trades"
+        if not read(("capp", seller.lower()), lambda: self.chain.carbon_approved(seller)):
+            return "seller has not approved the auction contract for ERC-1155 (setApprovalForAll)"
+        return None
 
     def _reject_reason(self, t: PreparedTrade, now: int, pending: Dict[bytes, int], seen: set) -> Optional[str]:
         sides = ((t.bid, t.struct[2], "bid"), (t.ask, t.struct[3], "ask"))
@@ -582,6 +659,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--contract", default=os.environ.get("AUCTION_CONTRACT_ADDRESS"))
     ap.add_argument("--batch-size", type=int, default=MAX_BATCH_SIZE)
     ap.add_argument("--dry-run", action="store_true", help="chỉ kiểm tra trước (đọc chain), không gửi giao dịch")
+    ap.add_argument("--no-funds-check", action="store_true",
+                    help="không kiểm số dư/allowance trước khi gửi (trade thiếu tiền sẽ lộ ra là FAILED sau khi gửi)")
+    ap.add_argument("--allow-contract-traders", action="store_true",
+                    help="chấp nhận bên mua có mã (hợp đồng hoặc EIP-7702); mặc định bỏ qua vì hook có thể đốt gas")
     ap.add_argument("--recover-tx", metavar="TX_HASH",
                     help="không gửi gì: đọc event của giao dịch đã đào rồi báo engine các trade của phiên đã SETTLED")
     args = ap.parse_args(argv)
@@ -600,7 +681,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     base = args.api_url.rstrip("/")
     payloads = _http("GET", f"{base}/api/v1/sessions/{args.session_id}/trades", api_key)["trades"]
     print(f"Phiên {args.session_id}: {len(payloads)} trade từ engine")
-    submitter = SettlementSubmitter(chain, args.batch_size)
+    submitter = SettlementSubmitter(chain, args.batch_size, check_funds=not args.no_funds_check,
+                                    allow_contract_traders=args.allow_contract_traders)
 
     if args.dry_run:
         prepared, outcomes = [], []

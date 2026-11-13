@@ -16,8 +16,8 @@ Trạng thái mỗi trade trong báo cáo của bot:
 | Trạng thái | Ý nghĩa |
 | --- | --- |
 | `SETTLED` | Có event `TradeSettled` trên chuỗi |
-| `SKIPPED` | Không gửi: payload sai hoặc kiểm tra trước thất bại (hết hạn, đã hủy on-chain, nonce thấp hơn, `tradeHash` đã dùng, vượt khối lượng đã ký, chữ ký không khớp) |
-| `FAILED` | Biết chắc trade không được thanh toán: hợp đồng bỏ qua trong `try/catch` (thường thiếu allowance hoặc số dư), hoặc giao dịch bị revert |
+| `SKIPPED` | Không gửi: payload sai hoặc kiểm tra trước thất bại (hết hạn, đã hủy on-chain, nonce thấp hơn, `tradeHash` đã dùng, vượt khối lượng đã ký, chữ ký không khớp, bên mua thiếu số dư hoặc allowance, bên bán thiếu tín chỉ hoặc chưa `setApprovalForAll`, bên mua có mã) |
+| `FAILED` | Biết chắc trade không được thanh toán: hợp đồng bỏ qua trong `try/catch` (số dư hoặc allowance thay đổi sau lần kiểm trước, hook ERC-1155 từ chối, hoặc chạy với `--no-funds-check`), hoặc giao dịch bị revert |
 | `UNKNOWN` | Đã gửi giao dịch nhưng không xác định được kết quả (hết giờ chờ biên nhận, lỗi mạng sau khi gửi, event không khớp). Giao dịch có thể vẫn được đào: dùng `--recover-tx` bên dưới, không chạy lại phiên |
 
 Các trade đã `SETTLED` ở batch trước luôn được báo cho engine, kể cả khi batch sau gặp lỗi.
@@ -56,6 +56,14 @@ Mã thoát: 0 khi mọi trade `SETTLED` hoặc `SKIPPED` và engine đã ghi nh�
 
 Trước khi gửi, bot bỏ qua (`SKIPPED`) các trade có chữ ký s cao (hợp đồng từ chối) và các trade hết hạn trong vòng 60 giây (có thể hết hạn trước khi block được đào).
 
+Bot còn kiểm các điều kiện mà hợp đồng chỉ phát hiện khi chuyển token. Số dư và allowance được cộng dồn theo từng bên trong cùng lần chạy, nên bên mua chỉ đủ tiền cho một trong hai trade thì trade thứ hai bị bỏ:
+- Bên mua: số dư và allowance token thanh toán, tối thiểu `matchAmount × clearingPrice` cộng các trade trước đó của họ.
+- Bên bán: số dư tín chỉ của `tokenId` và quyền `setApprovalForAll` cho hợp đồng đấu giá.
+- Bên mua có mã (hợp đồng hoặc EOA ủy quyền theo EIP-7702): bị bỏ qua mặc định, vì hook `onERC1155Received` của họ có thể đốt hết gas của batch (xem `docs/THREAT_MODELING.md`, mục 5.5). Cờ `--allow-contract-traders` cho phép lại.
+- Cờ `--no-funds-check` tắt phần kiểm số dư và allowance; dùng để thử đường `FAILED` hoặc khi RPC đọc token chậm. Kiểm mã của bên mua vẫn chạy.
+
+Kết quả kiểm là ảnh chụp tại thời điểm đọc: trader vẫn có thể rút allowance giữa lúc kiểm và lúc đào block, khi đó trade lộ ra là `FAILED`.
+
 ## Kiểm thử
 
 - Test đơn vị: `python -m unittest discover` trong `system_agents/matching_engine` (không cần mạng).
@@ -63,11 +71,11 @@ Trước khi gửi, bot bỏ qua (`SKIPPED`) các trade có chữ ký s cao (h�
   ```
   python system_agents/matching_engine/e2e_hardhat/run_e2e.py
   ```
-  Kịch bản: batch 2 trade thành công, nộp lại bị bỏ qua, trade thiếu allowance bị phát hiện `FAILED`.
+  Kịch bản: batch 2 trade thành công, nộp lại bị bỏ qua, `--recover-tx`, trade thiếu allowance bị bỏ trước khi gửi (`SKIPPED`) và, với `--no-funds-check`, bị hợp đồng bỏ qua (`FAILED`), bên mua có mã (giả lập EIP-7702 bằng `hardhat_setCode`) bị bỏ qua mặc định và `FAILED` khi cho phép.
 
 ## Giới hạn đã biết
 
-- Bot chưa kiểm số dư và allowance trước khi gửi; trade thiếu allowance chỉ lộ ra sau khi gửi (`FAILED`).
+- Kiểm số dư và allowance chỉ là ảnh chụp trước khi gửi; hợp đồng không khóa tài sản nên trader vẫn có thể rút giữa chừng (trade thành `FAILED`, mục 5.6 của `docs/THREAT_MODELING.md`). Bot chưa đặt giới hạn gas riêng cho từng trade (cần sửa hợp đồng: `try this.executeSettlementExternal{gas: ...}`) và chưa tránh dùng `estimateGas` khi batch có bên mua có mã được cho phép bằng `--allow-contract-traders`.
 - `tradeHash` của hợp đồng không có `sessionId`: khớp lại đúng cặp lệnh, đúng khối lượng và giá ở phiên sau bị hợp đồng từ chối (`TradeAlreadyExecuted`); bot phát hiện qua `executedTrades` và đặt `SKIPPED`. Cần Đức xem xét (xem `docs/THREAT_MODELING.md`, mục 3.2).
 - Engine chưa có trạng thái `PENDING_SETTLEMENT` (spec mục 4): `filled_amount` là khối lượng đã khớp, `settled_amount` là phần có bằng chứng on-chain; hai số có thể lệch.
 - Chưa chạy trên Amoy thật cho tới khi ví Operator được cấp quyền.

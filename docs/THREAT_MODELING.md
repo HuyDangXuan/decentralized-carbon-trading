@@ -285,13 +285,13 @@ return {
 
   Đối chứng: batch 3 trade hợp lệ dùng ≈ 0,50M gas và `estimateGas` ≈ 0,50M. Vậy một trade độc hại biến chi phí 0,5M thành ≈ 9,9M (gấp ≈ 20 lần) hoặc làm cả batch revert, và kẻ tấn công không mất gì (giao dịch do Operator trả).
 - **Mức độ:** **Trung bình** (cần 7702; chỉ gây tốn phí và trễ cho Operator và các trade khác trong batch, không mất tài sản). Argon xếp **Cao** và cho rằng không cần giả định thêm; mình không đồng ý ở cả hai điểm.
-- **Biện pháp đề xuất:** (a) giới hạn gas cho từng trade: `try this.executeSettlementExternal{gas: MAX_TRADE_GAS}(...)`; (b) bot kiểm `eth_getCode(bid.trader)` trước khi gửi và đặt `SKIPPED` nếu có mã; (c) bot không dựa vào `estimateGas` để quyết định gas limit khi batch có địa chỉ có mã.
+- **Biện pháp:** (a) *đề xuất, cần sửa hợp đồng:* giới hạn gas cho từng trade: `try this.executeSettlementExternal{gas: MAX_TRADE_GAS}(...)`; (b) *đã làm trong bot (13/11):* kiểm `eth_getCode(bid.trader)` trước khi gửi và đặt `SKIPPED` nếu có mã, trừ khi chạy `--allow-contract-traders`; kiểm thử trên Hardhat bằng `hardhat_setCode` (mục Phiên 3 của `run_e2e.py`); (c) *chưa làm:* khi cho phép bên mua có mã, bot vẫn dùng `estimateGas` x 1,3 nên có thể đặt gas limit rất lớn.
 
 #### 5.6. Rút allowance hoặc đổi trạng thái giữa batch để chọn lọc trade (biến thể của Free Option)
 - **Vị trí mã nguồn:** `contracts/CarbonDoubleAuction.sol:321, 324` (không khóa số dư/allowance).
 - **Phân tích:** ngoài việc rút allowance để hủy cả lệnh (đã nêu ở mục 3.1), trader có nhiều trade trong cùng batch chỉ để lại số dư vừa đủ cho các trade giá tốt đứng trước, hoặc (với 7702) rút allowance ngay trong hook của trade đầu để các trade sau revert. Hệ quả là các trade bị `catch` nuốt, đối tác thật mất cơ hội, không mất tài sản. Cùng điều kiện 7702 của mục 5.5 cho phần hook; phần rút allowance bằng giao dịch thường thì không cần.
 - **Mức độ:** **Trung bình.** Argon xếp Cao; không có thất thoát tài sản nên mình hạ mức.
-- **Biện pháp đề xuất:** kiểm số dư/allowance trước khi gửi (mục "Giới hạn đã biết" của `SETTLEMENT_SUBMITTER_GUIDE.md`), ký quỹ/escrow nếu muốn loại hẳn.
+- **Biện pháp:** *đã làm trong bot (13/11):* kiểm số dư, allowance, tín chỉ và `setApprovalForAll` trước khi gửi, cộng dồn theo từng bên trong batch (`SettlementSubmitter._funds_reject_reason`), nên trader thiếu tiền từ đầu bị `SKIPPED` thay vì làm hỏng trade của đối tác. Đây chỉ là ảnh chụp: trader vẫn rút được giữa lúc kiểm và lúc đào block. *Đề xuất:* ký quỹ/escrow nếu muốn loại hẳn.
 
 #### 5.7. Các điểm đã kiểm và không phải lỗi
 - **Làm tròn tại dòng 318:** `totalPayment = matchAmount * clearingPrice` là phép nhân `uint256`, không có phép chia nên không có sai số làm tròn; hai thừa số `uint128` nên tích không tràn `uint256`. Làm tròn giá nếu có chỉ xảy ra ở engine (`ROUNDING = "floor"`). Cả Argon và mình cùng kết luận **không tìm thấy**.

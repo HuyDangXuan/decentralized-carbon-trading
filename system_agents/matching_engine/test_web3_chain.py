@@ -229,6 +229,37 @@ class TestWeb3Chain(unittest.TestCase):
         self.assertEqual(self.chain.user_nonce(DUMMY_OPERATOR), 7)
 
 
+    def test_has_code_distinguishes_eoa_from_code(self):
+        # EOA thường: get_code trả b""; hợp đồng hoặc EOA ủy quyền EIP-7702: có byte.
+        self.w3.eth.get_code.return_value = b""
+        self.assertFalse(self.chain.has_code("0x" + "11" * 20))
+        self.w3.eth.get_code.return_value = bytes.fromhex("ef0100" + "22" * 20)
+        self.assertTrue(self.chain.has_code("0x" + "11" * 20))
+
+    def test_token_reads_use_the_tokens_named_by_the_auction_contract(self):
+        owner = "0x" + "11" * 20
+        self.contract.functions.paymentToken.return_value.call.return_value = "0x" + "aa" * 20
+        self.contract.functions.carbonToken.return_value.call.return_value = "0x" + "bb" * 20
+        payment, carbon = MagicMock(), MagicMock()
+        self.w3.eth.contract.side_effect = lambda address, abi: payment if address == "0x" + "aa" * 20 else carbon
+        payment.functions.balanceOf.return_value.call.return_value = 7
+        payment.functions.allowance.return_value.call.return_value = 9
+        carbon.functions.balanceOf.return_value.call.return_value = 3
+        carbon.functions.isApprovedForAll.return_value.call.return_value = True
+
+        self.assertEqual(self.chain.payment_balance(owner), 7)
+        self.assertEqual(self.chain.payment_allowance(owner), 9)
+        self.assertEqual(self.chain.carbon_balance(owner, 101), 3)
+        self.assertTrue(self.chain.carbon_approved(owner))
+        # allowance và quyền ERC-1155 phải tính cho đúng hợp đồng đấu giá làm spender/operator
+        spender = payment.functions.allowance.call_args[0][1]
+        self.assertEqual(spender, DUMMY_CONTRACT)
+        self.assertEqual(carbon.functions.isApprovedForAll.call_args[0][1], DUMMY_CONTRACT)
+        carbon.functions.balanceOf.assert_called_once()
+        self.assertEqual(carbon.functions.balanceOf.call_args[0][1], 101)
+        self.contract.functions.paymentToken.assert_called_once()  # token chỉ được tra một lần
+
+
 class TestSettlementCliFunctions(unittest.TestCase):
     @patch("settlement_submitter._http")
     def test_confirm_empty_list_returns_true_without_http_call(self, mock_http):

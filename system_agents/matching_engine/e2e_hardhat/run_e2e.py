@@ -152,10 +152,32 @@ def main() -> int:
         bid4 = place("noAllowance", 0, 30, 12_000_000)
         httpx.post(f"{API}/api/v1/sessions/run", json={"tokenId": 1}, headers=admin)
         res = settle(2)
-        assert res.returncode == 1 and n_lines(res.stdout, "SETTLED") == 1 and n_lines(res.stdout, "FAILED") == 1, res.stdout + res.stderr
+        # Bot kiểm trước số dư/allowance: trade của noAllowance bị bỏ (SKIPPED) trước khi gửi, không tốn gas.
+        assert res.returncode == 0 and n_lines(res.stdout, "SETTLED") == 1 and n_lines(res.stdout, "SKIPPED") == 1, res.stdout + res.stderr
+        assert "allowance" in res.stdout, res.stdout
         assert (order(bid3)["settled_amount"], order(bid4)["settled_amount"], order(ask2)["settled_amount"]) == (20, 0, 20)
         assert order(bid4)["filled_amount"] == 30 and order(ask2)["filled_amount"] == 50
-        print("   OK: trade thiếu allowance bị hợp đồng bỏ qua, bot báo FAILED, settled_amount lệch filled_amount")
+        print("   OK: trade thiếu allowance bị bỏ trước khi gửi (SKIPPED), settled_amount lệch filled_amount")
+
+        print("== Phiên 2 lần nữa với --no-funds-check: trade thiếu allowance được gửi, hợp đồng bỏ qua (FAILED)")
+        res = settle(2, "--no-funds-check")
+        assert res.returncode == 1 and "TxHash" in res.stdout, res.stdout + res.stderr
+        assert n_lines(res.stdout, "FAILED") == 1 and n_lines(res.stdout, "SKIPPED") == 1, res.stdout  # SKIPPED: trade của bid3 đã chạy
+        assert order(bid4)["settled_amount"] == 0
+        print("   OK")
+
+        print("== Phiên 3: bên mua là EOA ủy quyền mã (EIP-7702, giả lập bằng hardhat_setCode)")
+        ask3 = place("seller", 1, 10, 10_000_000)
+        bid5 = place("buyer2", 0, 10, 12_000_000, nonce=1)
+        httpx.post(f"{API}/api/v1/sessions/run", json={"tokenId": 1}, headers=admin)
+        w3.provider.make_request("hardhat_setCode", [cfg["buyer2"], "0xef0100" + cfg["usdc"][2:]])
+        res = settle(3)
+        assert res.returncode == 0 and n_lines(res.stdout, "SKIPPED") == 1 and "contract code" in res.stdout, res.stdout + res.stderr
+        assert order(bid5)["settled_amount"] == 0
+        # Với cờ cho phép, trade được gửi; hook ERC-1155 gọi vào mã không có onERC1155Received nên hợp đồng bỏ qua: FAILED.
+        res = settle(3, "--allow-contract-traders")
+        assert res.returncode == 1 and n_lines(res.stdout, "FAILED") == 1, res.stdout + res.stderr
+        print("   OK: bên mua có mã bị bỏ qua mặc định; khi cho phép thì trade chạy và bị hợp đồng bỏ qua")
         print("E2E PASSED")
         return 0
     finally:
