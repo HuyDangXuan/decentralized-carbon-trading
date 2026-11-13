@@ -129,7 +129,9 @@ Bề mặt tấn công (Attack Surface) trải rộng trên cả hai môi trư�
   1. Kẻ tấn công tạo hàng chục ví con rác không có số dư MockUSDC hoặc CarbonCredit.
   2. Kẻ tấn công ký và nộp hàng trăm lệnh GTC với khối lượng nhỏ (1 tCO2e) ở các mức giá khác nhau vào `POST /api/v1/orders` (`system_agents/matching_engine/api_service.py`, hàm `place_order`). Do API không kiểm tra số dư on-chain (`system_agents/matching_engine/api_service.py`, mục "Giới hạn của bản mock" ở docstring đầu file), các lệnh này đều được ghi nhận ở trạng thái `NEW`.
   3. Lệnh không khớp trong phiên hiện tại được chuyển tiếp (Rollover) qua các phiên sau, tăng biến đếm thâm niên `rollover_count += 1` (`system_agents/matching_engine/auction_agent.py:188, 215`).
-  4. Khi có cơ hội giao dịch thật, lệnh của kẻ tấn công có tuổi cao nhất (`sessions_alive`), được thuật toán `age_prorata` ưu tiên phân bổ trước (`system_agents/matching_engine/session_engine.py`, `docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md:50`).
+  4. Khi có thanh khoản thật, lệnh ảo gây hại theo hai đường (đã chỉnh sau review Argon, kiểm lại bằng `session_engine._allocate_side`):
+     - *Ưu tiên giá (tác động lớn hơn):* lệnh ảo đặt giá tốt hơn giá biên (mua cao, bán thấp) được khớp trọn trước mọi lệnh ở mức biên; khi settlement thất bại thì lệnh thật đối ứng đã khớp với chúng mất cơ hội trong phiên đó. Đường này không cần tích tuổi.
+     - *Ưu tiên tuổi (chỉ ở mức giá biên):* `age_prorata` chỉ chạy tại mức giá biên khi khối lượng khả dụng ở mức đó thiếu (`session_engine.py`, nhánh `age_prorata` của `_allocate_side`); nhóm tuổi cao được khớp trọn trước, Hamilton chỉ chia trong nhóm cuối. Lệnh ảo muốn hưởng ưu tiên này phải sống 1-3 phiên mà không bị khớp, rồi đúng tick của nó trở thành giá biên; kẻ tấn công không biết trước tick đó nhưng có thể rải lệnh nhiều tick với chi phí bằng 0.
   5. Đồng thời, việc chẻ nhỏ thành nhiều lệnh 1 tCO2e giúp kẻ tấn công khai thác hai khiếm khuyết toán học của phương pháp Hamilton Largest Remainder (được tài liệu hóa tại `docs/MATCHING_ENGINE_SPEC.md:162-164`):
      - *Hành vi tách lệnh có lợi (Order Splitting):* Nhóm lệnh {A=2, B=1, C=1} với 2 đơn vị khả dụng, A chỉ nhận 1 đơn vị; nếu A tách thành hai lệnh khối lượng 1 có số thứ tự nhỏ hơn B và C thì tổng A nhận trọn 2 đơn vị.
      - *Nghịch lý Alabama (Alabama Paradox):* Nhóm khối lượng (1, 3, 3) được chia (1, 1, 1) khi tổng khả dụng là 3, nhưng bị chia (0, 2, 2) khi tổng khả dụng tăng lên 4 (lệnh nhỏ mất phần khi đối ứng tăng khối lượng).
@@ -209,7 +211,7 @@ bytes32 tradeHash = keccak256(abi.encodePacked(
 
 ### 5. Các Nguy Cơ Khác Tìm Thấy Khi Đọc Mã Nguồn
 
-Qua quá trình rà soát trực tiếp mã nguồn hợp đồng và mã nguồn Python, phát hiện thêm 4 nguy cơ kỹ thuật cụ thể:
+Qua quá trình rà soát trực tiếp mã nguồn hợp đồng và mã nguồn Python, phát hiện thêm các nguy cơ kỹ thuật cụ thể (5.1-5.4 từ bản nháp, 5.5-5.7 sau review Argon ngày 13/11 và kiểm chứng lại):
 
 #### 5.1. Nguy cơ DoS qua hàm `cancelOrder` không kiểm tra quyền sở hữu (`contracts/CarbonDoubleAuction.sol:377-380`)
 - **Vị trí mã nguồn:** `contracts/CarbonDoubleAuction.sol:377-380`:
@@ -220,24 +222,30 @@ function cancelOrder(bytes32 orderId) external {
 }
 ```
 - **Phân tích rủi ro:** Hàm `cancelOrder` nhận tham số `orderId` và đánh dấu `cancelledOrders[orderId] = true` mà **HOÀN TOÀN KHÔNG KIỂM TRA** `msg.sender == order.trader` hay chữ ký của chủ sở hữu lệnh! Bất kỳ ai biết được `orderId` (vốn công khai trên API `GET /api/v1/orders/{orderId}` hoặc WebSocket) đều có thể gọi hàm này để hủy lệnh của nạn nhân trên chuỗi, gây từ chối dịch vụ (Griefing DoS) phá hoại toàn bộ phiên đấu giá.
-- **Biện pháp khắc phục:** Cần yêu cầu truyền struct `Order` kèm chữ ký hoặc lưu trữ mapping `mapping(bytes32 => address) public orderOwners` để kiểm tra `require(msg.sender == orderOwner, "Unauthorized")`.
+- **Mức độ:** **Cao về tính sẵn sàng** (không mất tài sản, nhưng chi phí tấn công chỉ là gas và `orderId` công khai qua API). Argon xác nhận phát hiện này (13/11).
+- **Biện pháp khắc phục (đã đổi sau review Argon):** hai hướng ở bản nháp đầu đều kém. `mapping(orderId => trader)` không khả thi vì hợp đồng không thấy lệnh trước khi settlement; `cancelOrder(Order, sig)` đổi ABI, tốn calldata và `ecrecover`, và không hủy trước được lệnh chưa ký. Hướng được chọn: gắn người gọi vào khóa hủy, giữ nguyên chữ ký hàm:
+```solidity
+function cancelOrder(bytes32 orderId) external {
+    cancelledOrders[keccak256(abi.encode(msg.sender, orderId))] = true;
+    emit OrderCancelled(msg.sender, orderId);
+}
+// _executeSettlement kiểm: cancelledOrders[keccak256(abi.encode(bid.trader, bid.orderId))] (và ask tương tự)
+```
+Kẻ tấn công chỉ ghi vào khóa của chính họ nên không ảnh hưởng lệnh của nạn nhân; trader vẫn hủy trước được `orderId` chưa tồn tại. Hệ quả cho bot: hàm `Web3Chain.cancelled` trong `settlement_submitter.py` hiện đọc `cancelledOrders(orderId)` trực tiếp, phải đổi sang đọc theo khóa `keccak256(abi.encode(trader, orderId))` khi hợp đồng được sửa.
 
 #### 5.2. Bế tắc thanh toán do va chạm `tradeHash` khi khớp từng phần (`contracts/CarbonDoubleAuction.sol:291-300`)
 - **Vị trí mã nguồn:** `contracts/CarbonDoubleAuction.sol:291-300`.
 - **Phân tích rủi ro:** Như đã phân tích tại mục 3.2, do `tradeHash` không chứa `sessionId` hay `fillIndex`, một cặp lệnh GTC khớp từng phần nhiều lần với cùng khối lượng và cùng mức giá sẽ sinh ra mã băm trùng nhau, khiến các lần thanh toán sau bị revert bởi `TradeAlreadyExecuted(tradeHash)`.
-- **Biện pháp khắc phục:** Sửa công thức tính mã băm bổ sung `nonce` hoặc `filledAmount` hiện tại:
-```solidity
-bytes32 tradeHash = keccak256(abi.encode(
-    bid.orderId,
-    ask.orderId,
-    trade.matchAmount,
-    trade.clearingPrice,
-    filledAmount[bid.orderId],
-    filledAmount[ask.orderId]
-));
-```
+- **Biện pháp khắc phục (đã đổi sau review Argon):** bản nháp đầu đề xuất đưa `filledAmount[...]` đọc từ storage vào hàm băm. Phương án đó **sai**: sau khi một trade thành công, `filledAmount` tăng nên bản gửi trùng đúng calldata (retry của Operator) có `tradeHash` khác và còn nằm trong hạn mức, nên khớp lần hai thay vì bị chặn. Mô hình kiểm chứng (`scripts/verify_argon_findings.py`, kết quả dưới):
 
-> Lưu ý: nếu hợp đồng sửa công thức `tradeHash` như trên, hàm `compute_trade_hash` trong `system_agents/matching_engine/settlement_submitter.py` phải đổi theo, nếu không bước kiểm tra trước của bot sẽ tính sai mã băm.
+| Cách | Gửi trùng đúng calldata | Hai phiên hợp lệ cùng amount/giá |
+| --- | --- | --- |
+| Hiện tại (4 trường) | bị chặn | **lần 2 bị chặn sai** |
+| Đọc `filledAmount` từ storage vào hash | **khớp đôi** (30 rồi 60) | khớp được |
+| `expectedBidFilled`, `expectedAskFilled` nằm trong calldata, hợp đồng bắt buộc bằng storage, và cùng vào hash | bị chặn | khớp được |
+
+  Hướng được chọn là dòng cuối: thêm hai trường `expectedBidFilled`, `expectedAskFilled` vào `MatchedTrade`, `require` chúng bằng `filledAmount` hiện tại, và đưa chúng vào `tradeHash`. Thay đổi này đổi ABI của struct nên cần Đức đồng ý. Bot phải đổi `compute_trade_hash` và tính trước giá trị `expected*` tuần tự trong batch (cộng dồn các trade đã xếp trước, chỉ tính trade dự kiến thành công).
+  Hệ quả còn lại: `tradeHash` phụ thuộc thứ tự trade trong batch và vào việc trade trước có thành công hay không; indexer không nên dùng `tradeHash` làm khóa duy nhất ngoài cặp `(bid, ask, expected*)`.
 
 #### 5.3. Endpoint kích hoạt phiên `POST /api/v1/sessions/run` không có xác thực mặc định (`system_agents/matching_engine/api_service.py` (docstring đầu file, hàm `run_session`, dòng `app = create_app()` ở cuối file))
 - **Vị trí mã nguồn:** `system_agents/matching_engine/api_service.py` (docstring đầu file, hàm `run_session`, dòng `app = create_app()` ở cuối file):
@@ -264,6 +272,31 @@ return {
 ```
 - **Phân tích rủi ro:** Khi người dùng gọi API `DELETE /api/v1/orders/{orderId}`, Matching Engine đánh dấu lệnh là `CANCELLED` ngoài chuỗi và trả về `onchain_valid_until: record.order.deadline`. Chữ ký EIP-712 gốc của người dùng vẫn có hiệu lực pháp lý đầy đủ trên smart contract cho đến khi hết `deadline`. Nếu Matching Engine bị xâm nhập hoặc có lỗi đồng bộ, chữ ký này vẫn có thể bị nộp on-chain để thanh toán mà người dùng không thể can thiệp nếu chưa tốn gas gọi `cancelOrder` hoặc `incrementNonce`.
 - **Biện pháp khắc phục:** Khuyến cáo người dùng đặt `deadline` ngắn sát với chu kỳ phiên (ví dụ 10-15 phút), hoặc tích hợp cơ chế ủy quyền hủy lệnh tự động lên chuỗi từ phía client.
+
+#### 5.5. Đốt gas qua hook `onERC1155Received` của bên mua (đã kiểm bằng mô phỏng Hardhat)
+- **Vị trí mã nguồn:** `contracts/CarbonDoubleAuction.sol:193` (`try this.executeSettlementExternal(trades[i])` không giới hạn gas) và dòng 324 (`carbonToken.safeTransferFrom(..., bid.trader, ...)`, ERC-1155 gọi `onERC1155Received` nếu `bid.trader` có mã).
+- **Điều kiện (Argon bỏ sót):** hợp đồng chỉ nhận chữ ký `ECDSA.recover` (dòng 357), không có EIP-1271, nên một hợp đồng thông thường **không thể** là `bid.trader` vì không có khóa riêng. Tấn công chỉ khả thi với EOA được ủy quyền mã theo EIP-7702 (mã ủy quyền có độ dài > 0 nên ERC-1155 vẫn gọi hook), hoặc nếu sau này hợp đồng bổ sung EIP-1271. Mạng Amoy có hỗ trợ 7702 hay không là **UNKNOWN**, mô phỏng dưới dùng Hardhat 2.29.1.
+- **Kết quả mô phỏng** (batch 3 trade, mỗi trade 10 tCO2e, một bên mua là EOA ủy quyền mã có hook `while(true){}`):
+
+| Vị trí trade độc hại | Gas limit 0,7M / 1,5M / 3M | Gas limit 10M |
+| --- | --- | --- |
+| đầu batch | **cả giao dịch hết gas, revert** | thành công nhưng chỉ 2/3 trade, `gasUsed` ≈ 9,89M |
+| giữa batch | **cả giao dịch hết gas, revert** (3 mức) | không đo (Hardhat sập vì thiếu RAM trong lần chạy này) |
+
+  Đối chứng: batch 3 trade hợp lệ dùng ≈ 0,50M gas và `estimateGas` ≈ 0,50M. Vậy một trade độc hại biến chi phí 0,5M thành ≈ 9,9M (gấp ≈ 20 lần) hoặc làm cả batch revert, và kẻ tấn công không mất gì (giao dịch do Operator trả).
+- **Mức độ:** **Trung bình** (cần 7702; chỉ gây tốn phí và trễ cho Operator và các trade khác trong batch, không mất tài sản). Argon xếp **Cao** và cho rằng không cần giả định thêm; mình không đồng ý ở cả hai điểm.
+- **Biện pháp đề xuất:** (a) giới hạn gas cho từng trade: `try this.executeSettlementExternal{gas: MAX_TRADE_GAS}(...)`; (b) bot kiểm `eth_getCode(bid.trader)` trước khi gửi và đặt `SKIPPED` nếu có mã; (c) bot không dựa vào `estimateGas` để quyết định gas limit khi batch có địa chỉ có mã.
+
+#### 5.6. Rút allowance hoặc đổi trạng thái giữa batch để chọn lọc trade (biến thể của Free Option)
+- **Vị trí mã nguồn:** `contracts/CarbonDoubleAuction.sol:321, 324` (không khóa số dư/allowance).
+- **Phân tích:** ngoài việc rút allowance để hủy cả lệnh (đã nêu ở mục 3.1), trader có nhiều trade trong cùng batch chỉ để lại số dư vừa đủ cho các trade giá tốt đứng trước, hoặc (với 7702) rút allowance ngay trong hook của trade đầu để các trade sau revert. Hệ quả là các trade bị `catch` nuốt, đối tác thật mất cơ hội, không mất tài sản. Cùng điều kiện 7702 của mục 5.5 cho phần hook; phần rút allowance bằng giao dịch thường thì không cần.
+- **Mức độ:** **Trung bình.** Argon xếp Cao; không có thất thoát tài sản nên mình hạ mức.
+- **Biện pháp đề xuất:** kiểm số dư/allowance trước khi gửi (mục "Giới hạn đã biết" của `SETTLEMENT_SUBMITTER_GUIDE.md`), ký quỹ/escrow nếu muốn loại hẳn.
+
+#### 5.7. Các điểm đã kiểm và không phải lỗi
+- **Làm tròn tại dòng 318:** `totalPayment = matchAmount * clearingPrice` là phép nhân `uint256`, không có phép chia nên không có sai số làm tròn; hai thừa số `uint128` nên tích không tràn `uint256`. Làm tròn giá nếu có chỉ xảy ra ở engine (`ROUNDING = "floor"`). Cả Argon và mình cùng kết luận **không tìm thấy**.
+- **Fee-on-transfer và blacklist của token thanh toán** (Argon nêu): không áp dụng cho `MockUSDC` trên testnet; với USDC thật, blacklist chỉ làm trade đó revert (bị `catch`), không mất tài sản. Ghi là giả định khi chuyển lên mainnet.
+- **Khẳng định K1-K4** (dải giá, chuyển token chỉ giữa hai `trader` đã ký, `pause()` chặn mọi đường settlement, lỗi một trade không làm revert các trade khác): đã đối chiếu với mã. `_verifyOrderSignature` (dòng 343-367) băm đủ 8 trường của `Order` gồm `trader` và `pricePerUnit`, nên K1 và K2 đúng; câu trả lời "CHƯA CHẮC" của Argon chỉ do đoạn trích bị rút gọn.
 
 ---
 
