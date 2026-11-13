@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from enum import Enum
@@ -57,7 +58,16 @@ ORDER_TYPES = {
 
 
 class SettlementError(Exception):
-    """Lỗi cấu hình, payload hoặc giao dịch on-chain."""
+    """Lỗi cấu hình, payload hoặc giao dịch on-chain.
+
+    `tx_hash`: giao dịch liên quan (nếu đã gửi). `unknown=True` khi giao dịch có thể vẫn được đào hoặc đã
+    được đào mà bot không đọc được kết quả; khi đó các trade trong batch phải được kiểm tra thủ công
+    (`--recover-tx`), không được coi là thất bại."""
+
+    def __init__(self, message: str, tx_hash: Optional[str] = None, unknown: bool = False):
+        super().__init__(message)
+        self.tx_hash = tx_hash
+        self.unknown = unknown
 
 
 class SettlementInconsistency(SettlementError):
@@ -67,7 +77,8 @@ class SettlementInconsistency(SettlementError):
 class TradeStatus(str, Enum):
     SETTLED = "SETTLED"  # có event TradeSettled
     SKIPPED = "SKIPPED"  # không gửi: payload sai hoặc kiểm tra trước thất bại
-    FAILED = "FAILED"  # đã gửi nhưng hợp đồng bỏ qua trade (hoặc giao dịch lỗi)
+    FAILED = "FAILED"  # biết chắc trade không được thanh toán (hợp đồng bỏ qua, hoặc giao dịch bị revert)
+    UNKNOWN = "UNKNOWN"  # đã gửi giao dịch nhưng không xác định được kết quả: kiểm tra bằng --recover-tx
 
 
 # ----------------------------------------------------------------------------- payload
@@ -93,6 +104,14 @@ def _bytes32(value: str, name: str) -> bytes:
     return raw
 
 
+SECP256K1_HALF_N = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+
+
+def is_low_s(signature: bytes) -> bool:
+    """OpenZeppelin ECDSA từ chối chữ ký có s > n/2 (chữ ký biến dạng); eth_account vẫn chấp nhận chúng."""
+    return int.from_bytes(signature[32:64], "big") <= SECP256K1_HALF_N
+
+
 def _signature(value: Optional[str], name: str) -> bytes:
     """65 byte (r, s, v). `v` ở dạng 0/1 được đổi thành 27/28 vì ecrecover của hợp đồng chỉ nhận 27/28."""
     try:
@@ -101,6 +120,8 @@ def _signature(value: Optional[str], name: str) -> bytes:
         raw = b""
     if len(raw) != 65:
         raise SettlementError(f"{name} must be a 65-byte ECDSA signature")
+    if not is_low_s(raw):
+        raise SettlementError(f"{name} has an s-value in the upper half of the curve; the contract (OpenZeppelin ECDSA) rejects it")
     if raw[64] in (0, 1):
         raw = raw[:64] + bytes([raw[64] + 27])
     return raw
@@ -312,37 +333,60 @@ class Web3Chain:
 
     # --- ghi
     def submit_batch(self, structs: List[Tuple[Any, ...]]) -> BatchReceipt:
+        """Gửi batch và đọc kết quả. Mọi lỗi được đổi thành SettlementError; sau khi đã gửi giao dịch,
+        lỗi có `unknown=True` kèm `tx_hash` vì giao dịch có thể vẫn được đào (dùng `--recover-tx`)."""
         w3, addr = self.w3, self.account.address
-        fn = self.contract.functions.batchSettleTrades(structs)
-        gas = int(fn.estimate_gas({"from": addr}) * self.gas_multiplier)
-        priority = max(int(w3.eth.max_priority_fee), self.min_priority_fee)
-        base_fee = int(w3.eth.get_block("latest").get("baseFeePerGas", 0))
-        tx = fn.build_transaction({
-            "from": addr,
-            "nonce": w3.eth.get_transaction_count(addr, "pending"),
-            "gas": gas,
-            "chainId": self.chain_id,
-            "maxPriorityFeePerGas": priority,
-            "maxFeePerGas": base_fee * 2 + priority,
-        })
-        signed = self.account.sign_transaction(tx)
-        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+        tx_hash_hex: Optional[str] = None
         try:
+            fn = self.contract.functions.batchSettleTrades(structs)
+            gas = int(fn.estimate_gas({"from": addr}) * self.gas_multiplier)
+            priority = max(int(w3.eth.max_priority_fee), self.min_priority_fee)
+            base_fee = int(w3.eth.get_block("latest").get("baseFeePerGas", 0))
+            tx = fn.build_transaction({
+                "from": addr,
+                "nonce": w3.eth.get_transaction_count(addr, "pending"),
+                "gas": gas,
+                "chainId": self.chain_id,
+                "maxPriorityFeePerGas": priority,
+                "maxFeePerGas": base_fee * 2 + priority,
+            })
+            signed = self.account.sign_transaction(tx)
+        except Exception as exc:  # chưa gửi gì: không có giao dịch nào có thể được đào
+            raise SettlementError(f"could not build the transaction: {type(exc).__name__}: {exc}")
+        try:
+            tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+            tx_hash_hex = "0x" + tx_hash.hex().removeprefix("0x")
             receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=self.receipt_timeout)
-        except Exception as exc:  # hết giờ chờ: giao dịch có thể vẫn được đào sau đó
-            raise SettlementError(f"no receipt for tx {tx_hash.hex()}: {exc}")
+        except Exception as exc:  # lỗi mạng/hết giờ chờ: giao dịch có thể đã hoặc sẽ được đào
+            raise SettlementError(f"no receipt for the batch ({type(exc).__name__}: {exc})", tx_hash_hex, unknown=True)
         if receipt["status"] != 1:
-            raise SettlementError(f"tx {tx_hash.hex()} reverted")
+            raise SettlementError(f"tx {tx_hash_hex} reverted", tx_hash_hex)
+        return self._parse_receipt(tx_hash_hex, receipt)
+
+    def receipt_for(self, tx_hash: str) -> BatchReceipt:
+        """Đọc kết quả một giao dịch đã được đào (dùng để khôi phục sau khi mất kết nối)."""
+        try:
+            receipt = self.w3.eth.get_transaction_receipt(tx_hash)
+        except Exception as exc:
+            raise SettlementError(f"cannot read the receipt of {tx_hash}: {type(exc).__name__}: {exc}", tx_hash, unknown=True)
+        if receipt["status"] != 1:
+            raise SettlementError(f"tx {tx_hash} reverted", tx_hash)
+        return self._parse_receipt(tx_hash, receipt)
+
+    def _parse_receipt(self, tx_hash: str, receipt: Any) -> BatchReceipt:
+        """Chỉ nhận log phát ra bởi chính hợp đồng (process_receipt của web3 không lọc theo địa chỉ phát)."""
         from web3.logs import DISCARD  # bỏ qua log của ERC-20/ERC-1155 (không nằm trong ABI) thay vì cảnh báo
 
+        own = self.contract_address.lower()
         events = self.contract.events
-        settled = [bytes(e["args"]["tradeHash"]) for e in events.TradeSettled().process_receipt(receipt, errors=DISCARD)]
-        done = events.BatchSettlementCompleted().process_receipt(receipt, errors=DISCARD)
-        count = success = None
-        if len(done) == 1:
-            count, success = int(done[0]["args"]["tradesCount"]), int(done[0]["args"]["successCount"])
-        return BatchReceipt("0x" + tx_hash.hex().removeprefix("0x"), int(receipt["blockNumber"]),
-                            int(receipt["gasUsed"]), settled, count, success)
+        settled = [bytes(e["args"]["tradeHash"]) for e in events.TradeSettled().process_receipt(receipt, errors=DISCARD)
+                   if str(e["address"]).lower() == own]
+        done = [e for e in events.BatchSettlementCompleted().process_receipt(receipt, errors=DISCARD)
+                if str(e["address"]).lower() == own]
+        if len(done) != 1:
+            raise SettlementError(f"tx {tx_hash}: expected exactly one BatchSettlementCompleted, got {len(done)}", tx_hash, unknown=True)
+        return BatchReceipt(tx_hash, int(receipt["blockNumber"]), int(receipt["gasUsed"]), settled,
+                            int(done[0]["args"]["tradesCount"]), int(done[0]["args"]["successCount"]))
 
 
 # ----------------------------------------------------------------------------- submitter
@@ -371,12 +415,16 @@ OnSettled = Callable[[PreparedTrade, TradeOutcome], None]
 
 
 class SettlementSubmitter:
-    def __init__(self, chain: ChainClient, batch_size: int = MAX_BATCH_SIZE, verify_signatures: bool = True):
+    def __init__(self, chain: ChainClient, batch_size: int = MAX_BATCH_SIZE, verify_signatures: bool = True,
+                 deadline_margin: int = 60):
         if not 1 <= batch_size <= MAX_BATCH_SIZE:
             raise ValueError(f"batch_size must be in [1, {MAX_BATCH_SIZE}]")
+        if deadline_margin < 0:
+            raise ValueError("deadline_margin must be >= 0")
         self.chain = chain
         self.batch_size = batch_size
         self.verify_signatures = verify_signatures
+        self.deadline_margin = deadline_margin  # giây: trade sắp hết hạn có thể hết hạn trước khi block được đào
 
     def precheck(self, trades: Sequence[PreparedTrade]) -> Tuple[List[PreparedTrade], List[TradeOutcome]]:
         """Mô phỏng các chốt chặn của hợp đồng (theo thứ tự dòng 224-300) bằng lệnh đọc, không tốn gas."""
@@ -409,8 +457,8 @@ class SettlementSubmitter:
                 if signer.lower() != order[1].lower():
                     return f"{side} signature does not recover to trader (wrong domain/contract?)"
         for order, _, side in sides:
-            if now > order[7]:
-                return f"{side} deadline expired"
+            if now + self.deadline_margin > order[7]:
+                return f"{side} deadline expired or within {self.deadline_margin}s of expiring"
         for order, _, side in sides:
             if self.chain.cancelled(order[0]):
                 return f"{side} order cancelled on-chain"
@@ -444,19 +492,29 @@ class SettlementSubmitter:
 
         for start in range(0, len(accepted), self.batch_size):
             batch = accepted[start:start + self.batch_size]
+            rest = accepted[start + self.batch_size:]
             try:
                 receipt = self.chain.submit_batch([t.struct for t in batch])
-            except SettlementError as exc:
-                report.error = str(exc)
-                report.outcomes.extend(self._outcome(t, TradeStatus.FAILED, str(exc)) for t in batch)
-                report.outcomes.extend(
-                    self._outcome(t, TradeStatus.SKIPPED, "not sent: an earlier batch failed")
-                    for t in accepted[start + self.batch_size:]
-                )
+            except Exception as exc:  # bất kỳ lỗi nào cũng không được làm mất kết quả của các batch trước
+                unknown = bool(getattr(exc, "unknown", False))
+                tx_hash = getattr(exc, "tx_hash", None)
+                if tx_hash:
+                    report.tx_hashes.append(tx_hash)
+                self._abort(report, batch, rest, str(exc), TradeStatus.UNKNOWN if unknown else TradeStatus.FAILED, tx_hash)
                 return report
             report.tx_hashes.append(receipt.tx_hash)
-            self._reconcile(batch, receipt, report, on_settled)
+            try:
+                self._reconcile(batch, receipt, report, on_settled)
+            except SettlementInconsistency as exc:
+                self._abort(report, batch, rest, str(exc), TradeStatus.UNKNOWN, receipt.tx_hash)
+                return report
         return report
+
+    def _abort(self, report: SettlementReport, batch: List[PreparedTrade], rest: List[PreparedTrade], message: str,
+               status: TradeStatus, tx_hash: Optional[str]) -> None:
+        report.error = message
+        report.outcomes.extend(self._outcome(t, status, message, tx_hash) for t in batch)
+        report.outcomes.extend(self._outcome(t, TradeStatus.SKIPPED, "not sent: an earlier batch failed") for t in rest)
 
     def _reconcile(self, batch: List[PreparedTrade], receipt: BatchReceipt, report: SettlementReport,
                    on_settled: Optional[OnSettled]) -> None:
@@ -486,13 +544,21 @@ class SettlementSubmitter:
 
     def settle_session(self, agent: DoubleAuctionAgent, session_id: int) -> SettlementReport:
         """Chế độ trong cùng tiến trình: lấy match của phiên từ `agent` và ghi nhận ngược vào chính nó."""
-        payloads = [trade_payload(agent, m) for m in agent.matches[session_id]]
+        payloads: List[Dict[str, Any]] = []
+        unsigned: List[TradeOutcome] = []
+        for m in agent.matches[session_id]:
+            try:
+                payloads.append(trade_payload(agent, m))
+            except SettlementError as exc:  # một lệnh không có chữ ký không được chặn cả phiên
+                unsigned.append(TradeOutcome(None, m.bid_order_id, m.ask_order_id, m.amount, TradeStatus.SKIPPED, str(exc)))
 
         def confirm(t: PreparedTrade, _: TradeOutcome) -> None:
             agent.confirm_settlement(t.bid_order_id, t.amount)
             agent.confirm_settlement(t.ask_order_id, t.amount)
 
-        return self.settle(payloads, confirm)
+        report = self.settle(payloads, confirm)
+        report.outcomes.extend(unsigned)
+        return report
 
 
 # ----------------------------------------------------------------------------- CLI
@@ -516,6 +582,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--contract", default=os.environ.get("AUCTION_CONTRACT_ADDRESS"))
     ap.add_argument("--batch-size", type=int, default=MAX_BATCH_SIZE)
     ap.add_argument("--dry-run", action="store_true", help="chỉ kiểm tra trước (đọc chain), không gửi giao dịch")
+    ap.add_argument("--recover-tx", metavar="TX_HASH",
+                    help="không gửi gì: đọc event của giao dịch đã đào rồi báo engine các trade của phiên đã SETTLED")
     args = ap.parse_args(argv)
 
     key = os.environ.get(KEY_ENV)
@@ -549,22 +617,63 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  SKIPPED {reason}")
         return 0
 
+    if args.recover_tx:
+        return _recover(chain, payloads, args.recover_tx, base, api_key)
+
     report = submitter.settle(payloads)
-    confirmations = [
-        {"tradeHash": o.trade_hash, "bidOrderId": o.bid_order_id, "askOrderId": o.ask_order_id, "amount": o.amount}
-        for o in report.outcomes if o.status == TradeStatus.SETTLED
-    ]
     for tx in report.tx_hashes:
         print(f"TxHash: {tx}")
     for o in report.outcomes:
         suffix = f" ({o.reason})" if o.reason else ""
         print(f"  {o.status.value} {o.trade_hash}{suffix}")
-    if confirmations:
-        _http("POST", f"{base}/api/v1/settlements/confirm", api_key, {"settlements": confirmations})
-        print(f"Đã ghi nhận {len(confirmations)} trade SETTLED về engine")
+    # Ghi nhận cả khi có lỗi ở batch sau: trade đã SETTLED ở batch trước là tiền đã chuyển thật.
+    confirmed = _confirm(base, api_key, [o for o in report.outcomes if o.status == TradeStatus.SETTLED])
     if report.error:
         print(f"LỖI: {report.error}", file=sys.stderr)
-    return 1 if report.error or report.count(TradeStatus.FAILED) else 0
+        unknown = [o for o in report.outcomes if o.status == TradeStatus.UNKNOWN and o.tx_hash]
+        if unknown:
+            print(f"Kết quả chưa xác định; kiểm tra bằng: --session-id {args.session_id} --recover-tx {unknown[0].tx_hash}",
+                  file=sys.stderr)
+    bad = report.error or report.count(TradeStatus.FAILED) or report.count(TradeStatus.UNKNOWN)
+    return 1 if bad or not confirmed else 0
+
+
+def _confirm(base: str, api_key: Optional[str], settled: Sequence[TradeOutcome]) -> bool:
+    """Báo engine các trade đã SETTLED. Trả False nếu việc báo thất bại (tiền đã chuyển nhưng engine chưa biết)."""
+    if not settled:
+        return True
+    items = [{"tradeHash": o.trade_hash, "bidOrderId": o.bid_order_id, "askOrderId": o.ask_order_id, "amount": o.amount}
+             for o in settled]
+    try:
+        _http("POST", f"{base}/api/v1/settlements/confirm", api_key, {"settlements": items})
+    except urllib.error.HTTPError as exc:
+        print(f"LỖI: engine từ chối ghi nhận {len(items)} trade ({exc.code}): {exc.read().decode('utf-8', 'replace')[:200]}",
+              file=sys.stderr)
+        return False
+    except OSError as exc:
+        print(f"LỖI: không gọi được engine để ghi nhận {len(items)} trade: {exc}", file=sys.stderr)
+        return False
+    print(f"Đã ghi nhận {len(items)} trade SETTLED về engine")
+    return True
+
+
+def _recover(chain: "Web3Chain", payloads: Sequence[Dict[str, Any]], tx_hash: str, base: str,
+             api_key: Optional[str]) -> int:
+    """Khôi phục sau khi mất kết quả của một giao dịch: đọc event TradeSettled của tx rồi báo engine."""
+    receipt = chain.receipt_for(tx_hash)
+    by_hash = {}
+    for p in payloads:
+        try:
+            t = prepare_trade(p)
+        except SettlementError:
+            continue
+        by_hash[t.trade_hash] = t
+    settled = [by_hash[h] for h in receipt.settled_hashes if h in by_hash]
+    foreign = len(receipt.settled_hashes) - len(settled)
+    print(f"Tx {tx_hash}: {len(receipt.settled_hashes)} TradeSettled, {len(settled)} thuộc phiên này"
+          + (f", {foreign} không thuộc phiên này (bỏ qua)" if foreign else ""))
+    outcomes = [SettlementSubmitter._outcome(t, TradeStatus.SETTLED, None, tx_hash) for t in settled]
+    return 0 if _confirm(base, api_key, outcomes) else 1
 
 
 if __name__ == "__main__":

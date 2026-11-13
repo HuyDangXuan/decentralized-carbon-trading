@@ -73,7 +73,14 @@
 *(Phi hãy ghi chú tiến độ thực nghiệm hoặc các lỗi gặp phải vào phần này rồi commit lên Git)*
 
 ```markdown
-- Ngày ...:
+- Ngày 13/11/2026:
 - Tiến độ:
+  - P.1: `settlement_submitter.py` đã xong và chạy thật trên node Hardhat cục bộ (chainId 80002) bằng `system_agents/matching_engine/e2e_hardhat/run_e2e.py`: batch 2 trade SETTLED, nộp lại bị bỏ qua, trade thiếu allowance bị phát hiện FAILED. Thêm 22 test (tổng 69 test ở matching_engine). CHƯA chạy trên Amoy: cần ví Operator có POL và được Đức cấp SETTLEMENT_OPERATOR_ROLE (hướng dẫn: docs/SETTLEMENT_SUBMITTER_GUIDE.md).
+  - P.2: đã có bộ kiểm chéo độc lập `simulation/equilibrium_crosscheck.py` (13 test). Ở m=2 và m=4 nó xếp nghiệm của find_equilibrium vào loại cân bằng xấp xỉ (exploitability 0,002-0,005; khai thật là 0,036-0,071). Các lần chạy m=32, m=64 và kịch bản nhiều đơn vị đang chạy, chưa có kết quả.
+  - P.3: docs/THREAT_MODELING.md là bản nháp; mỗi biện pháp "đã có trong mã" đã đối chiếu file:dòng; chưa có review độc lập.
+  - P.4: chưa làm, cần hai bài báo gốc.
 - Vấn đề phát sinh (nếu có):
+  - Contract: `cancelOrder` không kiểm tra người gọi (ai cũng hủy được lệnh của người khác); `tradeHash` không có sessionId nên khớp lại cùng cặp lệnh, khối lượng và giá ở phiên sau bị bỏ qua im lặng; `batchSettleTrades` nuốt lỗi từng trade (bot đọc event để biết). Cần báo Đức.
+  - Tiêu chí P.2 "O(1/m^2)": số liệu sơ bộ chưa ủng hộ cho mọi quy tắc giá (k=1, pair: độ dốc khoảng -0,96); báo cáo theo số liệu thật.
+  - Engine chưa có PENDING_SETTLEMENT: filled_amount (đã khớp) có thể lớn hơn settled_amount (có bằng chứng on-chain).
 ```

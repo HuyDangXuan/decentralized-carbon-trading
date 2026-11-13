@@ -11,6 +11,7 @@ Khóa dùng ở đây là các khóa dẫn xuất từ mnemonic công khai của
 
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -136,6 +137,13 @@ def main() -> int:
         print("== Nộp lại phiên 1: phải bị bỏ qua, không tx mới")
         again = settle(1)
         assert again.returncode == 0 and "TxHash" not in again.stdout and n_lines(again.stdout, "SKIPPED") == 2, again.stdout
+        print("   OK")
+
+        print("== Khôi phục từ tx của phiên 1 (--recover-tx): đọc event on-chain, engine không đếm trùng")
+        tx = re.search(r"TxHash: (0x[0-9a-fA-F]{64})", real.stdout).group(1)
+        rec = settle(1, "--recover-tx", tx)
+        assert rec.returncode == 0 and "2 TradeSettled, 2 thuộc phiên này" in rec.stdout, rec.stdout + rec.stderr
+        assert all(order(o)["settled_amount"] == order(o)["filled_amount"] for o in (ask1, bid1, bid2))
         print("   OK")
 
         print("== Phiên 2: ask 50 @ 10; bid buyer1 20 @ 12; bid noAllowance 30 @ 12 (không allowance)")

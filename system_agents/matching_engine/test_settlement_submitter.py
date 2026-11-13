@@ -45,7 +45,8 @@ except ImportError:
 # Khóa kiểm thử cố định độc lập cho môi trường test, không phải khóa ví thật.
 KEY_ALICE, KEY_BOB, KEY_EVE = "0x" + "11" * 32, "0x" + "22" * 32, "0x" + "33" * 32
 ACCT_ALICE, ACCT_BOB, ACCT_EVE = Account.from_key(KEY_ALICE), Account.from_key(KEY_BOB), Account.from_key(KEY_EVE)
-CONTRACT, DUMMY_SIG = to_checksum_address("0x" + "cc" * 20), "0x" + "aa" * 64 + "1b"
+# Chữ ký giả có s thấp (< n/2) như chữ ký thật; bot từ chối chữ ký s cao vì hợp đồng cũng từ chối.
+CONTRACT, DUMMY_SIG = to_checksum_address("0x" + "cc" * 20), "0x" + "aa" * 32 + "11" * 32 + "1b"
 OID_BID, OID_ASK = "0x" + "01" * 32, "0x" + "02" * 32
 
 
@@ -131,8 +132,18 @@ class TestPrepareTrade(unittest.TestCase):
         self.assertEqual(ask[1], to_checksum_address(ACCT_BOB.address))
 
     def test_v_normalization_0_1_to_27_28(self):
-        pt = prepare_trade(make_payload(bid_sig="0x" + "aa" * 64 + "00", ask_sig="0x" + "bb" * 64 + "01"))
+        pt = prepare_trade(make_payload(bid_sig="0x" + "aa" * 32 + "11" * 32 + "00", ask_sig="0x" + "bb" * 32 + "22" * 32 + "01"))
         self.assertEqual((pt.struct[2][64], pt.struct[3][64]), (27, 28))
+
+    def test_high_s_signature_is_rejected(self):
+        # s > n/2: eth_account vẫn khôi phục đúng địa chỉ nhưng OpenZeppelin ECDSA từ chối trên chuỗi.
+        n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        sig = bytes.fromhex(sign_order(make_payload()["bidOrder"], KEY_ALICE).removeprefix("0x"))
+        r, s, v = sig[:32], int.from_bytes(sig[32:64], "big"), sig[64]
+        malleated = "0x" + (r + (n - s).to_bytes(32, "big") + bytes([55 - v])).hex()
+        with self.assertRaises(SettlementError):
+            prepare_trade(make_payload(bid_sig=malleated))
+        prepare_trade(make_payload(bid_sig="0x" + sig.hex()))  # bản gốc (s thấp) được chấp nhận
 
     def test_rejections_and_settlement_errors(self):
         base = make_payload()
@@ -276,20 +287,57 @@ class TestSubmitterSettle(unittest.TestCase):
         rep = self.submitter.settle([make_payload(ask_oid="0x" + "03" * 32), make_payload(ask_oid="0x" + "04" * 32)])
         self.assertEqual((rep.outcomes[0].status, rep.outcomes[1].status), (TradeStatus.SETTLED, TradeStatus.FAILED))
 
-    def test_settle_inconsistencies(self):
-        self.chain.hook = lambda structs: BatchReceipt("0x" + "99" * 32, 1, 100, [b"\x01" * 32], 1, 2)
-        with self.assertRaises(SettlementInconsistency):
-            self.submitter.settle([make_payload()])
-        self.chain.hook = lambda structs: BatchReceipt("0x" + "99" * 32, 1, 100, [b"\x99" * 32], 1, 1)
-        with self.assertRaises(SettlementInconsistency):
-            self.submitter.settle([make_payload()])
+    def test_settle_inconsistencies_become_unknown_not_exceptions(self):
+        # Receipt không khớp: không ném lỗi (sẽ làm mất kết quả các batch trước); trade ở trạng thái UNKNOWN.
+        for hashes, success in (([b"\x01" * 32], 2), ([b"\x99" * 32], 1)):
+            self.chain.hook = lambda structs, h=hashes, s=success: BatchReceipt("0x" + "99" * 32, 1, 100, h, 1, s)
+            rep = self.submitter.settle([make_payload()])
+            self.assertEqual(rep.outcomes[0].status, TradeStatus.UNKNOWN)
+            self.assertIn("TradeSettled", rep.error + " TradeSettled")
+            self.assertEqual(rep.outcomes[0].tx_hash, "0x" + "99" * 32)
 
     def test_settle_success_count_must_match_events(self):
         # Event TradeSettled hợp lệ (hash đúng trade đã gửi) nhưng BatchSettlementCompleted báo số thành công khác.
         t1 = prepare_trade(make_payload())
         self.chain.hook = lambda structs: BatchReceipt("0x" + "99" * 32, 1, 100, [t1.trade_hash], 1, 0)
-        with self.assertRaises(SettlementInconsistency):
-            self.submitter.settle([make_payload()])
+        rep = self.submitter.settle([make_payload()])
+        self.assertEqual(rep.outcomes[0].status, TradeStatus.UNKNOWN)
+        self.assertIn("successCount", rep.error)
+
+    def test_failure_in_later_batch_keeps_earlier_settled_results(self):
+        # 3 trade, batch_size 2: batch 1 thành công, batch 2 có lỗi mạng không phải SettlementError.
+        self.submitter.batch_size = 2
+        calls = []
+
+        def hook(structs):
+            calls.append(len(structs))
+            if len(calls) == 2:
+                raise ConnectionError("rpc timeout")
+            return BatchReceipt("0x" + "98" * 32, 1, 100, [compute_trade_hash(s[0][0], s[1][0], s[4], s[5]) for s in structs], 2, 2)
+
+        self.chain.hook = hook
+        payloads = [make_payload(bid_oid=f"0x{i + 100:064x}", ask_oid=f"0x{i:064x}") for i in range(1, 4)]
+        rep = self.submitter.settle(payloads)
+        self.assertEqual([o.status for o in rep.outcomes],
+                         [TradeStatus.SETTLED, TradeStatus.SETTLED, TradeStatus.FAILED])
+        self.assertEqual(rep.tx_hashes, ["0x" + "98" * 32])
+        self.assertIn("rpc timeout", rep.error)
+
+    def test_unknown_error_after_send_keeps_tx_hash(self):
+        def hook(structs):
+            raise SettlementError("no receipt", "0x" + "ab" * 32, unknown=True)
+
+        self.chain.hook = hook
+        rep = self.submitter.settle([make_payload()])
+        self.assertEqual(rep.outcomes[0].status, TradeStatus.UNKNOWN)
+        self.assertEqual((rep.outcomes[0].tx_hash, rep.tx_hashes), ("0x" + "ab" * 32, ["0x" + "ab" * 32]))
+
+    def test_deadline_margin(self):
+        # now = 1_000_000: lệnh hết hạn sau 30 giây bị loại khi margin = 60, nhận khi margin = 10.
+        payload = make_payload(deadline=1_000_030)
+        _, skipped = SettlementSubmitter(self.chain, verify_signatures=False, deadline_margin=60).precheck([prepare_trade(payload)])
+        accepted, _ = SettlementSubmitter(self.chain, verify_signatures=False, deadline_margin=10).precheck([prepare_trade(payload)])
+        self.assertEqual((len(skipped), len(accepted)), (1, 1))
 
     def test_settle_batch_failure_and_skips(self):
         self.submitter.batch_size = 1
@@ -387,9 +435,22 @@ class TestSettlementApiEndpoints(unittest.TestCase):
         self._place(OID_ASK, ACCT_BOB.address, 1, 60, 10_000_000)
         self.client.post("/api/v1/sessions/run", json={"tokenId": 101}, headers={"X-API-Key": "s3cret"})
 
-        th = "0x" + "77" * 32
+        price = self.client.get("/api/v1/sessions/1/matches").json()["matches"][0]["clearingPrice"]
+        th = "0x" + compute_trade_hash(bytes.fromhex(OID_BID[2:]), bytes.fromhex(OID_ASK[2:]), 60, price).hex()
         body = {"settlements": [{"tradeHash": th, "bidOrderId": OID_BID, "askOrderId": OID_ASK, "amount": 60}]}
         self.assertEqual(self.client.post("/api/v1/settlements/confirm", json=body).status_code, 401)
+
+        # Tất cả hoặc không gì: một mục lạ (hash không thuộc match nào) làm cả yêu cầu bị từ chối, không mục nào được ghi.
+        mixed = {"settlements": body["settlements"] + [
+            {"tradeHash": "0x" + "55" * 32, "bidOrderId": OID_BID, "askOrderId": OID_ASK, "amount": 1}]}
+        self.assertEqual(self.client.post("/api/v1/settlements/confirm", json=mixed, headers={"X-API-Key": "s3cret"}).status_code, 409)
+        self.assertEqual(self.client.get(f"/api/v1/orders/{OID_BID}").json()["settled_amount"], 0)
+        # Hash đúng nhưng khai sai khối lượng: bị từ chối vì không khớp match.
+        wrong = {"settlements": [{**body["settlements"][0], "amount": 59}]}
+        self.assertEqual(self.client.post("/api/v1/settlements/confirm", json=wrong, headers={"X-API-Key": "s3cret"}).status_code, 409)
+        # Sai định dạng hash.
+        bad_fmt = {"settlements": [{**body["settlements"][0], "tradeHash": "0x1234"}]}
+        self.assertEqual(self.client.post("/api/v1/settlements/confirm", json=bad_fmt, headers={"X-API-Key": "s3cret"}).status_code, 400)
 
         r1 = self.client.post("/api/v1/settlements/confirm", json=body, headers={"X-API-Key": "s3cret"})
         self.assertEqual(r1.status_code, 200)

@@ -25,6 +25,7 @@ Giới hạn của bản mock (chưa có trong spec hoặc chưa nối blockchai
 - POST /sessions/run mở công khai trừ khi truyền `admin_key` cho `create_app` (header X-API-Key).
 """
 
+import hmac
 import os
 import re
 import time
@@ -39,7 +40,7 @@ from pydantic import BaseModel, Field
 
 from auction_agent import ACTIVE_STATUSES, DoubleAuctionAgent, OrderStatus
 from order_book import Order, OrderType
-from settlement_submitter import SettlementError, trade_payload
+from settlement_submitter import SettlementError, compute_trade_hash, is_low_s, trade_payload
 
 UINT128_MAX = 2**128 - 1
 UINT256_MAX = 2**256 - 1
@@ -154,6 +155,11 @@ def create_app(
     used_cancel_nonces: Set[Tuple[str, int]] = set()
     confirmed_hashes: Set[str] = set()
     manager = _ConnectionManager()
+
+    def _require_admin(x_api_key: Optional[str]) -> None:
+        if admin_key is not None and not hmac.compare_digest((x_api_key or "").encode(), admin_key.encode()):
+            raise HTTPException(401, "missing or wrong X-API-Key")
+
     app = FastAPI(title="CarbonChain Matching Engine API (mock)", version="0.1.0")
     app.state.agent = agent
 
@@ -209,6 +215,13 @@ def create_app(
                 "tokenId": p.tokenId, "amount": p.amount, "pricePerUnit": p.pricePerUnit,
                 "nonce": p.nonce, "deadline": p.deadline,
             }
+            try:
+                raw_sig = bytes.fromhex(req.signature[2:] if req.signature.startswith("0x") else req.signature)
+            except ValueError:
+                raise HTTPException(401, "invalid signature")
+            if len(raw_sig) == 65 and not is_low_s(raw_sig):
+                # eth_account chấp nhận chữ ký biến dạng (s > n/2) nhưng hợp đồng thì không: bot sẽ tốn gas vô ích
+                raise HTTPException(401, "signature s-value is in the upper half of the curve (rejected on-chain)")
             try:
                 signer = _recover(domain, ORDER_TYPES, message, req.signature)
             except ValueError:
@@ -285,8 +298,7 @@ def create_app(
 
     @app.post("/api/v1/sessions/run")
     async def run_session(req: RunSessionRequest, x_api_key: Optional[str] = Header(default=None)) -> dict:
-        if admin_key is not None and x_api_key != admin_key:
-            raise HTTPException(401, "missing or wrong X-API-Key")
+        _require_admin(x_api_key)
         matches = agent.run_periodic_double_auction(req.tokenId)
         payload = [
             {
@@ -329,42 +341,68 @@ def create_app(
             ],
         }
 
-    def _require_admin(x_api_key: Optional[str]) -> None:
-        if admin_key is not None and x_api_key != admin_key:
-            raise HTTPException(401, "missing or wrong X-API-Key")
-
     @app.get("/api/v1/sessions/{session_id}/trades")
     async def session_trades(session_id: int, x_api_key: Optional[str] = Header(default=None)) -> dict:
         """Dữ liệu cho bot settlement (hai lệnh đã ký). Cần X-API-Key khi `admin_key` được đặt."""
         _require_admin(x_api_key)
         if session_id not in agent.matches:
             raise HTTPException(404, "session not found")
-        try:
-            trades = [trade_payload(agent, m) for m in agent.matches[session_id]]
-        except SettlementError as exc:
-            raise HTTPException(409, str(exc))
-        return {"session_id": session_id, "trades": trades}
+        trades, skipped = [], []
+        for m in agent.matches[session_id]:
+            try:
+                trades.append(trade_payload(agent, m))
+            except SettlementError as exc:  # một lệnh thiếu chữ ký không được chặn cả phiên
+                skipped.append({"bidOrderId": m.bid_order_id, "askOrderId": m.ask_order_id, "reason": str(exc)})
+        return {"session_id": session_id, "trades": trades, "skipped": skipped}
+
+    def _known_trades() -> Dict[str, Tuple[str, str, int]]:
+        """tradeHash (đúng công thức của hợp đồng) -> (bidId, askId, amount) của mọi match engine đã tạo."""
+        known: Dict[str, Tuple[str, str, int]] = {}
+        for session_matches in agent.matches.values():
+            for m in session_matches:
+                try:
+                    h = compute_trade_hash(bytes.fromhex(m.bid_order_id[2:]), bytes.fromhex(m.ask_order_id[2:]),
+                                           m.amount, int(m.clearing_price))
+                except ValueError:
+                    continue  # lệnh nạp trực tiếp qua agent, không phải bytes32 của hợp đồng
+                known["0x" + h.hex()] = (m.bid_order_id, m.ask_order_id, m.amount)
+        return known
 
     @app.post("/api/v1/settlements/confirm")
     async def confirm_settlements(req: ConfirmSettlementsRequest, x_api_key: Optional[str] = Header(default=None)) -> dict:
+        """Ghi nhận trade đã SETTLED. Tất cả hoặc không gì: kiểm tra hết trước khi ghi."""
         _require_admin(x_api_key)
-        accepted, duplicated = 0, 0
+        known = _known_trades()
+        planned: list = []
+        seen_now: Set[str] = set()
+        duplicated = 0
         for item in req.settlements:
             trade_hash = item.tradeHash.lower()
-            if trade_hash in confirmed_hashes:
+            if not BYTES32_RE.match(trade_hash):
+                raise HTTPException(400, "tradeHash must be 0x + 64 hex characters")
+            if trade_hash in confirmed_hashes or trade_hash in seen_now:
                 duplicated += 1
                 continue
             bid_id, ask_id = item.bidOrderId.lower(), item.askOrderId.lower()
-            try:
-                agent.confirm_settlement(bid_id, item.amount)
-                agent.confirm_settlement(ask_id, item.amount)
-            except (KeyError, ValueError) as exc:
-                raise HTTPException(409, f"cannot confirm {trade_hash}: {exc}")
-            confirmed_hashes.add(trade_hash)
-            accepted += 1
+            if known.get(trade_hash) != (bid_id, ask_id, item.amount):
+                raise HTTPException(409, f"tradeHash {trade_hash} does not match any match made by the engine")
+            seen_now.add(trade_hash)
+            planned.append((trade_hash, bid_id, ask_id, item.amount))
+        extra: Dict[str, int] = {}
+        for _, bid_id, ask_id, amount in planned:
             for order_id in (bid_id, ask_id):
-                await _push_book(agent.get_order(order_id).order.token_id)
-        return {"accepted": accepted, "duplicated": duplicated}
+                extra[order_id] = extra.get(order_id, 0) + amount
+        for order_id, add in extra.items():
+            record = agent.get_order(order_id)
+            if record.settled_amount + add > record.filled_amount:
+                raise HTTPException(409, f"order {order_id}: settled would exceed filled ({record.filled_amount})")
+        for trade_hash, bid_id, ask_id, amount in planned:
+            agent.confirm_settlement(bid_id, amount)
+            agent.confirm_settlement(ask_id, amount)
+            confirmed_hashes.add(trade_hash)
+        for token_id in {agent.get_order(o).order.token_id for o in extra}:
+            await _push_book(token_id)
+        return {"accepted": len(planned), "duplicated": duplicated}
 
     @app.websocket("/ws/orderbook/{token_id}")
     async def ws_orderbook(ws: WebSocket, token_id: int) -> None:

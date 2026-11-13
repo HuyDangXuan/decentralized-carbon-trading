@@ -17,7 +17,10 @@ Trạng thái mỗi trade trong báo cáo của bot:
 | --- | --- |
 | `SETTLED` | Có event `TradeSettled` trên chuỗi |
 | `SKIPPED` | Không gửi: payload sai hoặc kiểm tra trước thất bại (hết hạn, đã hủy on-chain, nonce thấp hơn, `tradeHash` đã dùng, vượt khối lượng đã ký, chữ ký không khớp) |
-| `FAILED` | Đã gửi nhưng hợp đồng bỏ qua trade trong `try/catch` (thường thiếu allowance hoặc số dư) |
+| `FAILED` | Biết chắc trade không được thanh toán: hợp đồng bỏ qua trong `try/catch` (thường thiếu allowance hoặc số dư), hoặc giao dịch bị revert |
+| `UNKNOWN` | Đã gửi giao dịch nhưng không xác định được kết quả (hết giờ chờ biên nhận, lỗi mạng sau khi gửi, event không khớp). Giao dịch có thể vẫn được đào: dùng `--recover-tx` bên dưới, không chạy lại phiên |
+
+Các trade đã `SETTLED` ở batch trước luôn được báo cho engine, kể cả khi batch sau gặp lỗi.
 
 Giao dịch `batchSettleTrades` vẫn thành công khi có trade lỗi bên trong; bot chỉ dựa vào event, không dựa vào trạng thái giao dịch.
 
@@ -43,7 +46,15 @@ python settlement_submitter.py --session-id 1 --dry-run   # chỉ kiểm tra tr�
 python settlement_submitter.py --session-id 1             # nộp thật, in TxHash
 ```
 
-Mã thoát: 0 khi mọi trade `SETTLED` hoặc `SKIPPED`; 1 khi có trade `FAILED` hoặc lỗi giao dịch; 2 khi thiếu cấu hình.
+Khi có trade `UNKNOWN`, bot in sẵn lệnh khôi phục. Lệnh này không gửi giao dịch nào: nó đọc event `TradeSettled` của giao dịch đã đào rồi báo engine các trade của phiên đã được thanh toán:
+
+```
+python settlement_submitter.py --session-id 1 --recover-tx 0x<tx_hash>
+```
+
+Mã thoát: 0 khi mọi trade `SETTLED` hoặc `SKIPPED` và engine đã ghi nhận; 1 khi có trade `FAILED`/`UNKNOWN`, lỗi giao dịch, hoặc engine không ghi nhận được; 2 khi thiếu cấu hình.
+
+Trước khi gửi, bot bỏ qua (`SKIPPED`) các trade có chữ ký s cao (hợp đồng từ chối) và các trade hết hạn trong vòng 60 giây (có thể hết hạn trước khi block được đào).
 
 ## Kiểm thử
 
