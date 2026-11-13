@@ -1,0 +1,50 @@
+[
+  {
+    "action": "Khởi tạo Lô Tín chỉ (mintProjectLot)",
+    "txHash": "0x70030602f06059860a162f8173a94b52bfc5b4b1b0fcbb13be182115d223c191",
+    "gasUsed": 309894,
+    "costPOL": "0.010846290019523322",
+    "avgGasPerTrade": 309894,
+    "savingsPercent": "0% (Baseline)"
+  },
+  {
+    "action": "Khớp lệnh Đơn lẻ (settleMatchedTrade)",
+    "txHash": "0x96b795e9d891be0ede5124044aae3048447486bc07092aa5cb33f320ccfb82fe",
+    "gasUsed": 286145,
+    "costPOL": "0.010015075018027135",
+    "avgGasPerTrade": 286145,
+    "savingsPercent": "0% (Baseline)"
+  },
+  {
+    "action": "Khớp lô 5 cặp lệnh (Batch 5)",
+    "txHash": "0x35df6836aec429e7890c56be47bfd8c9ed1084b50ad43473ec3ab30ef3787187",
+    "gasUsed": 763384,
+    "costPOL": "0.026718440048093192",
+    "avgGasPerTrade": 152677,
+    "savingsPercent": "-46.6%"
+  },
+  {
+    "action": "Khớp lô 10 cặp lệnh (Batch 10)",
+    "txHash": "0xd499608a97dc731205e37c109f8a2ba6e5196d73dfe3ed772bed5f34e2b5c8b4",
+    "gasUsed": 1420946,
+    "costPOL": "0.049733110089519598",
+    "avgGasPerTrade": 142095,
+    "savingsPercent": "-50.3%"
+  },
+  {
+    "action": "Khớp lô 20 cặp lệnh (Batch 20)",
+    "txHash": "0x5fc657bf3715b3a9536ffc39b1fa6181eeee243656f5973b829caf3abfa51e68",
+    "gasUsed": 2735854,
+    "costPOL": "0.095754890172358802",
+    "avgGasPerTrade": 136793,
+    "savingsPercent": "-52.2%"
+  },
+  {
+    "action": "Tiêu hủy Bù đắp (retireCarbonCredit)",
+    "txHash": "0x007c649d04977c061b132081743af2a23b0ec55a1af116b8a1064f217b4e128e",
+    "gasUsed": 66365,
+    "costPOL": "0.002322775004180995",
+    "avgGasPerTrade": 66365,
+    "savingsPercent": "N/A"
+  }
+]

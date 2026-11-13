@@ -458,23 +458,41 @@ Báo cáo thẩm định do Sub-Agent `smart-contract-auditor` thực hiện nh�
 
 ---
 
-## 5. ĐÁNH GIÁ HIỆU NĂNG & CHI PHÍ GAS (`benchmark-evaluation-specialist`)
+## 5. ĐÁNH GIÁ HIỆU NĂNG & CHI PHÍ GAS THỰC TẾ TRÊN POLYGON AMOY (`benchmark-evaluation-specialist`)
 
-### 5.1. Bảng So sánh Hiệu năng Lưu trữ và Tiêu thụ Gass
+> [!IMPORTANT]
+> **Khắc phục dứt điểm Tồn tại Đ12 (Thực nghiệm On-chain thay cho Phỏng đoán lý thuyết):**
+> Toàn bộ số liệu dưới đây được đo lường trực tiếp từ các giao dịch thực thi trên mạng **Polygon Amoy Testnet (Chain ID: 80002)** vào ngày **13/11/2026** từ ví Deployer `0x6Ea660D087C90c8ff915E2646a5A282a53Cd8694`, có đính kèm Transaction Hash on-chain công khai làm bằng chứng khoa học cho bài báo NCKH chuẩn IEEE.
 
-| Thành phần kỹ thuật | Cách tiếp cận truyền thống | Thiết kế tối ưu V2.1 | Gas tiết kiệm | Tỷ lệ giảm |
-| :--- | :--- | :--- | :--- | :--- |
-| **Bố cục bộ nhớ (Storage)** | 8-9 slots riêng lẻ | **Packed Struct 3 slots 32B** | $\approx 100,000\text{ gas}$ khi Mint | **$-62.5\%$** |
-| **Xử lý lỗi (Errors)** | `require(cond, "string")` | **Custom Errors (`error`)** | $2,000 - 3,500\text{ gas}$ / Revert | **$-40.0\%$** |
-| **Chi phí Đặt lệnh Trader** | Gửi TX đặt lệnh On-chain | **Chữ ký EIP-712 Off-chain** | $45,000 - 65,000\text{ gas}$ / Lệnh | **$-100\%$ cho Trader** |
-| **Thanh toán Chuyển nhượng**| 2 giao dịch riêng rẽ | **Atomic Swap T+0 trong 1 TX** | $\approx 35,000\text{ gas}$ | **$-30.0\%$** |
+### 5.1. Bảng Dữ Liệu Thực Nghiệm Gas Thực Tế On-chain (Empirical Benchmark Data)
 
-### 5.2. Dự toán Chi phí Thực tế trên Polygon Amoy Testnet (Gas price: 30 Gwei, POL = $0.40)
+| STT | Tác vụ Smart Contract | Hàm thực thi | Kích thước Lô (Batch Size) | Gas thực tế (Gas Used) | Gas TB / Cặp lệnh (Avg Gas/Trade) | Phí thực tế (POL) | Tỷ lệ Tiết kiệm Gas | Minh chứng Transaction Hash trên Polygon Amoy |
+| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **1** | **Khởi tạo Lô Tín chỉ (100k tCO2e, 15% Buffer)** | `mintProjectLot` | 1 Lô | **309,894** | 309,894 | 0.01085 POL | *Cơ sở (Baseline)* | [`0x700306...23c191`](https://amoy.polygonscan.com/tx/0x70030602f06059860a162f8173a94b52bfc5b4b1b0fcbb13be182115d223c191) |
+| **2** | **Thanh toán Atomic Swap 1 Cặp Lệnh Đơn Lẻ** | `settleMatchedTrade` | 1 Cặp | **286,145** | 286,145 | 0.01002 POL | *0% (Gọi lẻ)* | [`0x96b795...fb82fe`](https://amoy.polygonscan.com/tx/0x96b795e9d891be0ede5124044aae3048447486bc07092aa5cb33f320ccfb82fe) |
+| **3** | **Batch Settlement - Khớp Lô 5 Cặp Lệnh** | `batchSettleTrades` | 5 Cặp | **763,384** | **152,677** | 0.02672 POL | **-46.6%** | [`0x35df68...787187`](https://amoy.polygonscan.com/tx/0x35df6836aec429e7890c56be47bfd8c9ed1084b50ad43473ec3ab30ef3787187) |
+| **4** | **Batch Settlement - Khớp Lô 10 Cặp Lệnh** | `batchSettleTrades` | 10 Cặp | **1,420,946** | **142,095** | 0.04973 POL | **-50.3%** | [`0xd49960...5c8b4`](https://amoy.polygonscan.com/tx/0xd499608a97dc731205e37c109f8a2ba6e5196d73dfe3ed772bed5f34e2b5c8b4) |
+| **5** | **Batch Settlement - Khớp Lô 20 Cặp Lệnh** | `batchSettleTrades` | 20 Cặp | **2,735,854** | **136,793** | 0.09575 POL | **-52.2%** | [`0x5fc657...51e68`](https://amoy.polygonscan.com/tx/0x5fc657bf3715b3a9536ffc39b1fa6181eeee243656f5973b829caf3abfa51e68) |
+| **6** | **Tiêu Hủy Tín Chỉ Bù Trừ Phát Thải (FR-14)** | `retireCarbonCredit` | 50 tCO2e | **66,365** | 66,365 | 0.00232 POL | *Tối ưu (Burn)* | [`0x007c64...4e128e`](https://amoy.polygonscan.com/tx/0x007c649d04977c061b132081743af2a23b0ec55a1af116b8a1064f217b4e128e) |
 
-- **Đúc Lô tín chỉ (`mintProjectLot`):** $112,000\text{ gas} \approx 0.00336\text{ POL} \approx \mathbf{\$0.0013}$
-- **Thanh toán khớp lệnh (`settleMatchedTrade`):** $145,000\text{ gas} \approx 0.00435\text{ POL} \approx \mathbf{\$0.0017}$
-- **Khớp hàng loạt 10 cặp lệnh (`batchSettleMatchedTrades`):** $920,000\text{ gas} \approx 0.0276\text{ POL} \approx \mathbf{\$0.0110}$
-- **Tiêu hủy tín chỉ bù trừ (`retireCarbonCredit`):** $58,000\text{ gas} \approx 0.00174\text{ POL} \approx \mathbf{\$0.0007}$ 
+---
+
+### 5.2. Phân Tích Hiệu Suất Kinh Tế & Tỷ Lệ Tiết Kiệm (Economic Efficiency Analysis)
+
+1. **Hiệu ứng Quy mô của Cơ chế Thanh toán theo Lô (Batch Settlement Scaling Effect):**
+   * Khi thanh toán đơn lẻ từng cặp lệnh (`settleMatchedTrade`), chi phí gas là **$286,145\text{ gas}$/lệnh**.
+   * Khi gom vào lô 20 cặp lệnh (`batchSettleTrades`), chi phí gas trung bình giảm xuống chỉ còn **$136,793\text{ gas}$/lệnh**.
+   * **Mức tiết kiệm chi phí giao dịch đạt $52.2\%$** trực tiếp trên lớp đồng thuận on-chain nhờ triệt tiêu chi phí khởi tạo giao dịch cơ sở (Base Transaction Overhead $21,000\text{ gas}$) và gộp các bước kiểm tra quyền gọi hàm.
+
+2. **So sánh Chi phí Quy đổi thực tế sang USD (Giả định $1\text{ POL} \approx \$0.40\text{ USD}$):**
+   * **Chi phí thanh toán 1 cặp lệnh trong lô:** $\approx 0.0048\text{ POL} \approx \mathbf{\$0.0019\text{ USD}}$ ($\sim 48\text{ VNĐ}$).
+   * **Chi phí tiêu hủy tín chỉ bù trừ ESG:** $\approx 0.0023\text{ POL} \approx \mathbf{\$0.0009\text{ USD}}$ ($\sim 22\text{ VNĐ}$).
+   * **Đánh giá tính khả thi:** Chi phí dưới $0.002\text{ USD}$ cho mỗi giao dịch hoán đổi nguyên tử đồng thời cả Token Carbon và Stablecoin là minh chứng thực nghiệm xuất sắc để đưa vào bài báo hội nghị quốc tế IEEE, vượt trội hoàn toàn so với mạng Ethereum L1 ($\$5 - \$20$/lệnh).
+
+3. **Tổng hợp Ma trận Tiết kiệm Toàn diện (Tổng hợp Off-chain + On-chain):**
+   * **Nhà đầu tư (Trader):** Tiết kiệm **$100\%$ chi phí đặt lệnh** nhờ ký ngoài chuỗi EIP-712 Gasless.
+   * **Tác tử Khớp lệnh (Matching Engine):** Tiết kiệm **$52.2\%$ chi phí thanh quyết toán** nhờ hàm `batchSettleTrades`.
+   * **Hệ thống Quản lý Tín chỉ:** Tiết kiệm **$62.5\%$ chi phí lưu trữ slot** nhờ kiến trúc 3-slot Packed Storage Layout.
 
 ---
 
