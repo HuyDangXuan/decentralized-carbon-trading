@@ -57,7 +57,7 @@
 
 #### 🔲 Task Đ.4: Đo lường & Cập nhật Benchmark Gas Thực tế trên Polygon Amoy
 * **Hạn chót:** **16/11/2026**
-* **Trạng thái:** `- [ ] Đang thực hiện`
+* **Trạng thái:** `- [x] Đã hoàn thành (13/11/2026 - Đo lường thành công 6 kịch bản on-chain có TxHash PolygonScan)`
 * **Mô tả công việc:**
   1. Chạy các giao dịch thực tế trên Polygon Amoy để đo lường chính xác lượng gas tiêu thụ:
      * Chi phí gas khi mint 1 lô tín chỉ carbon (`CarbonCredit1155.sol`).
@@ -78,5 +78,15 @@
   - Hoàn thành Task Đ.1: 14/14 test cases PASS 100%, gas batch settlement đạt 67,750 gas/cặp lệnh (< 85,000 gas chuẩn NFR-02).
   - Hoàn thành Task Đ.2: Cấu hình ví MetaMask thành công, nhận 1.0 POL faucet và deploy thành công cả 3 hợp đồng lên mạng Polygon Amoy Testnet (vượt tiến độ 2 ngày so với deadline 14/11).
   - Hoàn thành Task Đ.3: Biên soạn xong tệp docs/DEPLOYED_ADDRESSES.md chứa toàn bộ địa chỉ contract, cấu hình RPC và hướng dẫn tích hợp chi tiết bàn giao cho Thắng (Frontend) và Phi (Matching Bot).
-  - Chuẩn bị Task Đ.4: Chạy benchmark gas thực nghiệm on-chain lấy TxHash thật trên Polygon Amoy.
+
+- Ngày 13/11/2026:
+  - Hoàn thành Task Đ.4: Chạy thành công script scripts/benchmark_amoy_gas.js đo lường 6 kịch bản giao dịch thực tế trên Polygon Amoy Testnet.
+  - Kết quả đo lường thực nghiệm:
+    + Mint lô tín chỉ (100k tCO2e): 309,894 gas (Tx: 0x700306...23c191)
+    + Settle 1 cặp lệnh đơn lẻ: 286,145 gas (Tx: 0x96b795...fb82fe)
+    + Batch 5 cặp lệnh: 763,384 gas (TB: 152,677 gas/lệnh, tiết kiệm 46.6% - Tx: 0x35df68...787187)
+    + Batch 10 cặp lệnh: 1,420,946 gas (TB: 142,095 gas/lệnh, tiết kiệm 50.3% - Tx: 0xd49960...5c8b4)
+    + Batch 20 cặp lệnh: 2,735,854 gas (TB: 136,793 gas/lệnh, tiết kiệm 52.2% - Tx: 0x5fc657...51e68)
+    + Tiêu hủy tín chỉ (50 tCO2e): 66,365 gas (Tx: 0x007c64...4e128e)
+  - Cập nhật bảng dữ liệu thực nghiệm có kèm 6 link PolygonScan vào Mục 5 file docs/SMART_CONTRACT_SPEC.md, giải quyết dứt điểm tồn tại Đ12.
 ```
