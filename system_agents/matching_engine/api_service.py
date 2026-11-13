@@ -9,6 +9,8 @@ Endpoint (tiền tố `/api/v1`):
 - POST   /sessions/run               kích hoạt một phiên khớp lệnh (cron job hoặc tác tử)
 - GET    /sessions/current           số phiên kế tiếp
 - GET    /sessions/{sessionId}/matches
+- GET    /sessions/{sessionId}/trades dành cho bot settlement: mỗi match kèm hai lệnh đã ký (MatchedTrade)
+- POST   /settlements/confirm         bot báo các trade đã có event TradeSettled; engine ghi `settled_amount`
 - WS     /ws/orderbook/{tokenId}     snapshot khi kết nối, rồi orderbook.update / match.executed
 
 Chạy thử:  uvicorn api_service:app --reload   (Swagger UI ở /docs)
@@ -37,6 +39,7 @@ from pydantic import BaseModel, Field
 
 from auction_agent import ACTIVE_STATUSES, DoubleAuctionAgent, OrderStatus
 from order_book import Order, OrderType
+from settlement_submitter import SettlementError, trade_payload
 
 UINT128_MAX = 2**128 - 1
 UINT256_MAX = 2**256 - 1
@@ -94,6 +97,17 @@ class RunSessionRequest(BaseModel):
     tokenId: int = Field(ge=0, le=UINT256_MAX)
 
 
+class SettlementItem(BaseModel):
+    tradeHash: str
+    bidOrderId: str
+    askOrderId: str
+    amount: int = Field(gt=0, le=UINT128_MAX)
+
+
+class ConfirmSettlementsRequest(BaseModel):
+    settlements: list[SettlementItem]
+
+
 def _recover(domain: dict, types: dict, message: dict, signature: str) -> str:
     """Trả về địa chỉ (chữ thường) đã ký; ném ValueError nếu chữ ký sai định dạng."""
     try:
@@ -138,6 +152,7 @@ def create_app(
         or os.environ.get("AUCTION_CONTRACT_ADDRESS", "0x" + "0" * 40),
     }
     used_cancel_nonces: Set[Tuple[str, int]] = set()
+    confirmed_hashes: Set[str] = set()
     manager = _ConnectionManager()
     app = FastAPI(title="CarbonChain Matching Engine API (mock)", version="0.1.0")
     app.state.agent = agent
@@ -171,6 +186,7 @@ def create_app(
             "remaining_amount": r.remaining_amount,
             "filled_amount": r.filled_amount,
             "rollover_count": r.rollover_count,
+            "settled_amount": r.settled_amount,
         }
 
     @app.post("/api/v1/orders", status_code=201)
@@ -216,6 +232,7 @@ def create_app(
             signature=req.signature,
             time_in_force=req.time_in_force,
             deadline=p.deadline,
+            nonce=p.nonce,
         )
         agent.submit_order(order)
         await _push_book(p.tokenId)
@@ -311,6 +328,43 @@ def create_app(
                 for m in agent.matches[session_id]
             ],
         }
+
+    def _require_admin(x_api_key: Optional[str]) -> None:
+        if admin_key is not None and x_api_key != admin_key:
+            raise HTTPException(401, "missing or wrong X-API-Key")
+
+    @app.get("/api/v1/sessions/{session_id}/trades")
+    async def session_trades(session_id: int, x_api_key: Optional[str] = Header(default=None)) -> dict:
+        """Dữ liệu cho bot settlement (hai lệnh đã ký). Cần X-API-Key khi `admin_key` được đặt."""
+        _require_admin(x_api_key)
+        if session_id not in agent.matches:
+            raise HTTPException(404, "session not found")
+        try:
+            trades = [trade_payload(agent, m) for m in agent.matches[session_id]]
+        except SettlementError as exc:
+            raise HTTPException(409, str(exc))
+        return {"session_id": session_id, "trades": trades}
+
+    @app.post("/api/v1/settlements/confirm")
+    async def confirm_settlements(req: ConfirmSettlementsRequest, x_api_key: Optional[str] = Header(default=None)) -> dict:
+        _require_admin(x_api_key)
+        accepted, duplicated = 0, 0
+        for item in req.settlements:
+            trade_hash = item.tradeHash.lower()
+            if trade_hash in confirmed_hashes:
+                duplicated += 1
+                continue
+            bid_id, ask_id = item.bidOrderId.lower(), item.askOrderId.lower()
+            try:
+                agent.confirm_settlement(bid_id, item.amount)
+                agent.confirm_settlement(ask_id, item.amount)
+            except (KeyError, ValueError) as exc:
+                raise HTTPException(409, f"cannot confirm {trade_hash}: {exc}")
+            confirmed_hashes.add(trade_hash)
+            accepted += 1
+            for order_id in (bid_id, ask_id):
+                await _push_book(agent.get_order(order_id).order.token_id)
+        return {"accepted": accepted, "duplicated": duplicated}
 
     @app.websocket("/ws/orderbook/{token_id}")
     async def ws_orderbook(ws: WebSocket, token_id: int) -> None:
