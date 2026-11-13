@@ -248,8 +248,8 @@ async def run_session(req: RunSessionRequest, x_api_key: Optional[str] = Header(
     if admin_key is not None and x_api_key != admin_key:
         raise HTTPException(401, "missing or wrong X-API-Key")
 ```
-- **Phân tích rủi ro:** Trong file `api_service.py`, hàm `create_app` được gọi mặc định ở cuối file (`app = create_app()`) mà không truyền tham số `admin_key`. Do đó `admin_key is None`, khối kiểm tra `x_api_key` bị bỏ qua hoàn toàn. Bất kỳ ai trên Internet cũng có thể gửi HTTP POST tới `/api/v1/sessions/run` để kích hoạt khớp lệnh tùy tiện, phá vỡ chu kỳ Call Phase 5 phút / 15 phút và làm xáo trộn vòng đời lệnh.
-- **Biện pháp khắc phục:** Bắt buộc cấu hình `ADMIN_API_KEY` trong biến môi trường và từ chối khởi động service nếu thiếu key bảo vệ.
+- **Phân tích rủi ro:** Khi biến môi trường `MATCHING_API_KEY` không được đặt, `app = create_app(...)` ở cuối `api_service.py` có `admin_key is None` nên khối kiểm tra `x_api_key` bị bỏ qua hoàn toàn. Bất kỳ ai truy cập được service đều gửi được HTTP POST tới `/api/v1/sessions/run` để kích hoạt khớp lệnh tùy tiện, phá vỡ chu kỳ Call Phase 5 phút / 15 phút và làm xáo trộn vòng đời lệnh. (Bản đầu của mục này, viết trước khi có biến `MATCHING_API_KEY`, nêu rằng service luôn mở.)
+- **Biện pháp khắc phục:** Service đọc `MATCHING_API_KEY` và bảo vệ ba endpoint quản trị (`/sessions/run`, `/sessions/{id}/trades`, `/settlements/confirm`) bằng header `X-API-Key`; kiểm thử end-to-end (`system_agents/matching_engine/e2e_hardhat/run_e2e.py`) kiểm cả trường hợp thiếu khóa bị từ chối. Còn thiếu: từ chối khởi động ở môi trường production khi biến không được đặt.
 
 #### 5.4. Bất đối xứng trạng thái hủy lệnh: Hủy mềm ngoài chuỗi không vô hiệu hóa chữ ký on-chain (`system_agents/matching_engine/api_service.py` (hàm `cancel_order`))
 - **Vị trí mã nguồn:** `system_agents/matching_engine/api_service.py` (hàm `cancel_order`):

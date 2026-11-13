@@ -381,4 +381,6 @@ def create_app(
     return app
 
 
-app = create_app()
+# Đặt MATCHING_API_KEY để bảo vệ /sessions/run, /sessions/{id}/trades và /settlements/confirm (header X-API-Key).
+# Không đặt biến này thì các endpoint đó mở công khai (chỉ dùng khi chạy thử cục bộ).
+app = create_app(admin_key=os.environ.get("MATCHING_API_KEY") or None)
