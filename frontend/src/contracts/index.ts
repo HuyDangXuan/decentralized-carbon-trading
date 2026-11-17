@@ -10,11 +10,13 @@ export const CONTRACT_ADDRESSES = {
     carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_CARBON_CREDIT_ADDRESS ?? process.env.NEXT_PUBLIC_AMOY_CARBON_CREDIT_ADDRESS),
     carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_CARBON_AUCTION_ADDRESS ?? process.env.NEXT_PUBLIC_AMOY_AUCTION_ADDRESS),
     mockUsdc: configuredAddress(process.env.NEXT_PUBLIC_MOCK_USDC_ADDRESS),
+    evccFaucet: configuredAddress(process.env.NEXT_PUBLIC_AMOY_EVCC_FAUCET_ADDRESS),
   },
   sepolia: {
     carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_CARBON_CREDIT_ADDRESS),
     carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_AUCTION_ADDRESS),
     mockUsdc: undefined,
+    evccFaucet: undefined,
   },
 } as const;
 export function getContractAddresses(chainId?: number) {

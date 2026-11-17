@@ -14,6 +14,17 @@ Nếu đã có `.env.local`, cập nhật riêng `NEXT_PUBLIC_AMOY_RPC_URL` theo
 
 Module ABI đấu giá cần artifact tương thích trước khi bật chức năng ký lệnh. Xem hướng dẫn importer trong tài liệu bàn giao.
 
+### Faucet thử nghiệm (T.2)
+
+Kết nối MetaMask trên Polygon Amoy và mở **Faucet thử nghiệm** ở đầu trang. Ví dùng POL thử nghiệm để trả phí mạng. Nút **Nhận 10.000 MockUSDC** gọi trực tiếp hợp đồng MockUSDC. Nút **Nhận 100 EVCC (#101)** lấy tín chỉ đã được đúc từ faucet và mỗi ví nhận một lần. Bảng số dư cập nhật sau khi blockchain xác nhận.
+
+Để bật nút EVCC trên bản triển khai của nhóm:
+
+1. Người có `VERIFIER_ROLE` tạo lô thử #101 (Rừng Tây Bắc, vintage 2026) trên hợp đồng EVCC đã bàn giao, với metadata của lô và đủ tín chỉ lưu hành để cấp thử. Nếu lô đã tồn tại, dùng số dư của chủ lô.
+2. Người triển khai faucet cấu hình `AMOY_RPC_URL`, `PRIVATE_KEY` của ví triển khai testnet và `AMOY_CARBON_CREDIT_ADDRESS` trong môi trường Hardhat. Từ thư mục gốc, chạy `npx hardhat run scripts/deploy_evcc_faucet.js --network amoy`.
+3. Chủ số dư chuyển tín chỉ #101 vào địa chỉ faucet bằng `safeTransferFrom`. Mỗi lượt nhận cần 100 tín chỉ lưu hành, sau phần trích quỹ dự phòng của lô.
+4. Đặt địa chỉ được in ra vào `NEXT_PUBLIC_AMOY_EVCC_FAUCET_ADDRESS` trong `frontend/.env.local`, khởi động lại frontend, rồi xác nhận hai giao dịch từ một ví thử có POL. So sánh số dư trên UI với biên nhận và số dư blockchain sau mỗi lần nhận.
+
 ```powershell
 npm test
 npm run typecheck

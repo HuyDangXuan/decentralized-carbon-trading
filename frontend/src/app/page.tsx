@@ -12,6 +12,7 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { CreditBalanceCard } from "@/components/CreditBalanceCard";
 import { MockUsdcBalanceCard } from "@/components/MockUsdcBalanceCard";
+import { FaucetModal } from "@/components/FaucetModal";
 import { TradingFloor } from "@/components/TradingFloor";
 import { parseTokenId } from "@/lib/orders";
 
@@ -42,6 +43,7 @@ export default function HomePage() {
           {/* Network + Wallet */}
           <div className="flex flex-wrap max-w-full items-center gap-3">
             <NetworkBadge />
+            <FaucetModal />
             <ConnectWalletButton />
           </div>
         </div>
