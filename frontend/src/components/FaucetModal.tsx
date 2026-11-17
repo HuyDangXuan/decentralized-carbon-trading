@@ -6,8 +6,11 @@ import { BaseError, UserRejectedRequestError, type Hash } from "viem";
 import { useAccount, useConfig, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { getAccount } from "wagmi/actions";
 import { polygonAmoy } from "wagmi/chains";
-import { getContractAddresses } from "../contracts";
-import { evccFaucetAbi, mockUsdcMintAbi, MOCK_USDC_FAUCET_AMOUNT } from "../contracts/faucet";
+import { CARBON_CREDIT_1155_ABI, getContractAddresses } from "../contracts";
+import {
+  AMOY_PROJECT_EVCC_FAUCET, EVCC_FAUCET_AMOUNT, EVCC_FAUCET_LOT,
+  amoyFaucetFees, evccFaucetAbi, mockUsdcMintAbi, MOCK_USDC_FAUCET_AMOUNT,
+} from "../contracts/faucet";
 
 type Asset = "mockUsdc" | "evcc";
 type Operation = {
@@ -31,14 +34,16 @@ export function FaucetModal() {
   const onAmoy = isConnected && chainId === polygonAmoy.id;
   const contracts = getContractAddresses(chainId);
   const faucetAddress = contracts?.evccFaucet;
+  const creditAddress = contracts?.carbonCredit1155;
+  const isProjectFaucet = faucetAddress?.toLowerCase() === AMOY_PROJECT_EVCC_FAUCET.toLowerCase();
   const scope = `${address ?? ""}:${chainId ?? ""}`;
   const visibleOperation = operation?.scope === scope ? operation : undefined;
-  const statusEnabled = Boolean(isOpen && onAmoy && address && faucetAddress && contracts?.carbonCredit1155);
+  const statusEnabled = Boolean(isOpen && onAmoy && address && faucetAddress && creditAddress);
   const faucetCredit = useReadContract({
     chainId: polygonAmoy.id,
     address: faucetAddress,
     abi: evccFaucetAbi,
-    functionName: "credit",
+    functionName: isProjectFaucet ? "carbonCredit" : "credit",
     query: { enabled: statusEnabled },
   });
   const claimStatus = useReadContract({
@@ -47,13 +52,26 @@ export function FaucetModal() {
     abi: evccFaucetAbi,
     functionName: "claimStatus",
     args: address ? [address] : undefined,
-    query: { enabled: statusEnabled },
+    query: { enabled: statusEnabled && !isProjectFaucet },
   });
-  const [claimed, funded] = claimStatus.data ?? [false, false];
+  const inventory = useReadContract({
+    chainId: polygonAmoy.id,
+    address: creditAddress,
+    abi: CARBON_CREDIT_1155_ABI,
+    functionName: "balanceOf",
+    args: faucetAddress ? [faucetAddress, EVCC_FAUCET_LOT] : undefined,
+    query: { enabled: statusEnabled && isProjectFaucet },
+  });
+  const activeStatus = isProjectFaucet ? inventory : claimStatus;
+  const claimed = !isProjectFaucet && claimStatus.data?.[0] === true;
+  const funded = isProjectFaucet
+    ? (inventory.data ?? 0n) >= EVCC_FAUCET_AMOUNT
+    : claimStatus.data?.[1] === true;
   const creditMatches = Boolean(
-    faucetCredit.data && faucetCredit.data.toLowerCase() === contracts?.carbonCredit1155?.toLowerCase(),
+    faucetCredit.data && faucetCredit.data.toLowerCase() === creditAddress?.toLowerCase(),
   );
-  const evccReady = Boolean(statusEnabled && creditMatches && funded && !claimed && !claimStatus.isError && !faucetCredit.isError);
+  const statusError = activeStatus.isError || faucetCredit.isError;
+  const evccReady = Boolean(statusEnabled && creditMatches && funded && !claimed && !statusError);
 
   function open() {
     dialog.current?.showModal();
@@ -92,6 +110,7 @@ export function FaucetModal() {
       const distribute = { ...params, abi: evccFaucetAbi, functionName: "claim" } as const;
       if (asset === "mockUsdc") await publicClient.simulateContract(mint);
       else await publicClient.simulateContract(distribute);
+      const fees = amoyFaucetFees(await publicClient.estimateFeesPerGas());
 
       const wallet = getAccount(config);
       if (wallet.address !== address || wallet.chainId !== polygonAmoy.id) {
@@ -99,8 +118,8 @@ export function FaucetModal() {
       }
       setOperation({ scope, status: "wallet", message: "Hãy xác nhận giao dịch trong MetaMask." });
       hash = asset === "mockUsdc"
-        ? await writeContractAsync({ ...mint, chainId: polygonAmoy.id })
-        : await writeContractAsync({ ...distribute, chainId: polygonAmoy.id });
+        ? await writeContractAsync({ ...mint, ...fees, chainId: polygonAmoy.id })
+        : await writeContractAsync({ ...distribute, ...fees, chainId: polygonAmoy.id });
       setOperation({ scope, status: "pending", message: "Đang chờ xác nhận trên Polygon Amoy…", hash });
       const receipt = await publicClient.waitForTransactionReceipt({
         hash,
@@ -128,7 +147,7 @@ export function FaucetModal() {
         : cause instanceof BaseError ? cause.shortMessage
         : cause instanceof Error ? cause.message
         : "Không thể nhận token. Hãy kiểm tra mạng và số dư POL.";
-      if (asset === "evcc" && statusEnabled) void claimStatus.refetch();
+      if (asset === "evcc" && statusEnabled) void activeStatus.refetch();
       setOperation({ scope, status: unconfirmed ? "unconfirmed" : "error", message, hash });
     } finally {
       inProgress.current = false;
@@ -136,11 +155,11 @@ export function FaucetModal() {
     }
   }
 
-  let evccNote = "Mỗi ví thử nghiệm nhận một lần.";
+  let evccNote = isProjectFaucet ? "Faucet cấp 100 EVCC #101 mỗi lượt khi còn tồn kho." : "Mỗi ví thử nghiệm nhận một lần.";
   if (!faucetAddress) evccNote = "Faucet EVCC chưa được triển khai hoặc cấu hình.";
   else if (!contracts?.carbonCredit1155) evccNote = "Chưa cấu hình hợp đồng EVCC trên Amoy.";
-  else if (claimStatus.isError || faucetCredit.isError) evccNote = "Không đọc được trạng thái faucet EVCC.";
-  else if (claimStatus.isPending || faucetCredit.isPending) evccNote = "Đang kiểm tra faucet EVCC…";
+  else if (statusError) evccNote = "Không đọc được trạng thái faucet EVCC.";
+  else if (activeStatus.isPending || faucetCredit.isPending) evccNote = "Đang kiểm tra faucet EVCC…";
   else if (!creditMatches) evccNote = "Faucet chưa được nối với hợp đồng EVCC của dự án.";
   else if (claimed) evccNote = "Ví này đã nhận EVCC từ faucet.";
   else if (!funded) evccNote = "Faucet chưa có đủ EVCC #101 để cấp.";

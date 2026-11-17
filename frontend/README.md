@@ -16,20 +16,11 @@ Module ABI đấu giá cần artifact tương thích trước khi bật chức n
 
 ### Faucet thử nghiệm (T.2)
 
-Kết nối MetaMask trên Polygon Amoy và mở **Faucet thử nghiệm** ở đầu trang. Ví dùng POL thử nghiệm để trả phí mạng. Nút **Nhận 10.000 MockUSDC** gọi trực tiếp hợp đồng MockUSDC. Nút **Nhận 100 EVCC (#101)** lấy tín chỉ đã được đúc từ faucet và mỗi ví nhận một lần. Bảng số dư cập nhật sau khi blockchain xác nhận.
+Kết nối MetaMask trên Polygon Amoy và mở **Faucet thử nghiệm** ở đầu trang. Ví dùng POL thử nghiệm để trả phí mạng. Nút **Nhận 10.000 MockUSDC** gọi trực tiếp hợp đồng MockUSDC. Nút **Nhận 100 EVCC (#101)** gọi `claim()` trên faucet của nhóm khi tồn kho còn ít nhất 100 EVCC. Bảng số dư cập nhật sau khi blockchain xác nhận.
 
-Để bật nút EVCC trên bản triển khai của nhóm:
+Sao chép cấu hình trong `.env.example` vào `frontend/.env.local` hoặc thêm `NEXT_PUBLIC_AMOY_EVCC_FAUCET_ADDRESS=0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED` vào tệp cấu hình hiện có. Frontend cũng đọc `NEXT_PUBLIC_EVCC_FAUCET_ADDRESS` từ hướng dẫn bàn giao khi biến trên để trống. Khởi động lại frontend sau khi cập nhật cấu hình. Đức đã nạp 1.000 EVCC #101 vào địa chỉ này. [Giao dịch nạp faucet](https://amoy.polygonscan.com/tx/0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d)
 
-1. Lô #101 đã có trên CarbonCredit1155 Amoy `0x851978601b47a61B8aF3bcC1707B689Fbc977697`. Ví giữ lô của Đức `0x6Ea660D087C90c8ff915E2646a5A282a53Cd8694` nhận 8.500 EVCC lưu hành và 1.500 EVCC dự phòng. [Giao dịch tạo lô](https://amoy.polygonscan.com/tx/0xc4eeb089df2de6643690c658c3c41cc4d524189b86d38cd13524b77064fd159b)
-2. Từ thư mục gốc, người giữ lô cấu hình `AMOY_RPC_URL` và `PRIVATE_KEY` của ví Amoy trong môi trường Hardhat cục bộ. Chạy lệnh dưới đây để triển khai và nạp 300 EVCC lưu hành, đủ cho ba lượt thử. Nếu faucet đã triển khai, đặt thêm `AMOY_EVCC_FAUCET_ADDRESS` bằng địa chỉ đã in ra và chạy lại để bổ sung phần còn thiếu tới 300. Script kiểm tra hợp đồng, lô và số dư dự phòng trước khi nạp.
-
-   ```powershell
-   $env:AMOY_CARBON_CREDIT_ADDRESS = '0x851978601b47a61B8aF3bcC1707B689Fbc977697'
-   $env:AMOY_EVCC_FAUCET_TARGET_BALANCE = '300'
-   npx hardhat run scripts/deploy_evcc_faucet.js --network amoy
-   ```
-
-3. Đặt địa chỉ được in ra vào `NEXT_PUBLIC_AMOY_EVCC_FAUCET_ADDRESS` trong `frontend/.env.local`, rồi khởi động lại frontend. Ghi số dư trước khi nhận. Kết nối MetaMask bằng ví thử có POL, mở faucet và xác nhận từng giao dịch. UI và blockchain phải cùng tăng 10.000 MockUSDC và 100 EVCC #101. Mở lại modal để xác nhận nút EVCC báo ví đã nhận. Ghi lại địa chỉ thử, hai mã giao dịch và số dư trước/sau vào nhật ký T.2.
+Khi nghiệm thu, ghi lại số dư trước khi bấm từng nút rồi xác nhận qua MetaMask. Đối chiếu mỗi biên nhận và số dư trên UI. Mức tăng cần đạt là 10.000 MockUSDC và 100 EVCC #101. Ghi địa chỉ ví, hai mã giao dịch và số dư trước/sau vào nhật ký T.2.
 
 ```powershell
 npm test
