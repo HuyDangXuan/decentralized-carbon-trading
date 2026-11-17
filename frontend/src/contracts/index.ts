@@ -1,6 +1,6 @@
 import { isAddress, zeroAddress, type Address } from "viem";
 export { CARBON_CREDIT_1155_ABI } from "./CarbonCredit1155ABI";
-export { CARBON_DOUBLE_AUCTION_ABI, AUCTION_ABI_READY, AUCTION_NONCE_FUNCTION } from "./CarbonDoubleAuctionABI";
+export { CARBON_DOUBLE_AUCTION_ABI, AUCTION_NONCE_FUNCTION } from "./CarbonDoubleAuctionABI";
 
 function configuredAddress(value?: string): Address | undefined {
   return value && isAddress(value) && value.toLowerCase() !== zeroAddress ? value as Address : undefined;

@@ -1,6 +1,6 @@
-import type { SignedOrder } from "../lib/orders";
+import { TimeInForce, type SignedOrder } from "../lib/orders";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_MATCHING_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = "/matching";
 const WS_BASE_URL = process.env.NEXT_PUBLIC_MATCHING_WS_URL ?? "ws://localhost:8000";
 export interface ApiResponse<T> { success: boolean; data?: T; error?: string; timestamp: number }
 export const ORDER_STATUSES = ["NEW", "ACTIVE", "PARTIALLY_FILLED", "FILLED", "ROLLED_OVER", "EXPIRED", "CANCELLED", "REJECTED", "ONCHAIN_PENDING", "SETTLED_FINAL"] as const;
@@ -10,10 +10,17 @@ export interface OrderBookEntry {
   amount: string; remainingAmount: string; pricePerUnit: string; status: OrderStatus;
   createdAt?: number; rolloverCount?: number;
 }
-export interface OrderBookSnapshot { tokenId: string; bids: OrderBookEntry[]; asks: OrderBookEntry[]; lastClearingPrice?: string }
-export interface CurrentSession {
-  sessionId: string; tokenId: string; phase: "CALL" | "MATCH" | "SETTLE";
+export interface OrderBookLevel { pricePerUnit: string; remainingAmount: string; orderCount: number }
+export interface OrderBookSnapshot { tokenId: string; bids: OrderBookLevel[]; asks: OrderBookLevel[]; lastClearingPrice?: string }
+export type CurrentSession = { sessionId: string; tokenId: string } & ({
+  mode: "manual";
+} | {
+  mode: "scheduled";
+  phase: "CALL" | "MATCH" | "SETTLE";
   cutoffAt: number; phaseEndsAt: number; durationSeconds: 300 | 900;
+});
+export function sessionAcceptsOrders(session: CurrentSession | null, now = Date.now() / 1000): boolean {
+  return !!session && (session.mode === "manual" || (session.phase === "CALL" && session.cutoffAt > now));
 }
 export interface MatchedPair { bidOrderId: string; askOrderId: string; matchAmount: string; clearingPrice: string; tradeHash: string }
 export interface SessionResult { sessionId: string; tokenId: string; clearingPrice: string; totalMatchedAmount: string; matchCount: number; matches: MatchedPair[]; executedAt: number }
@@ -61,6 +68,52 @@ export function normalizeOrder(value: unknown): OrderBookEntry {
     ...(field(data, "rolloverCount", "rollover_count") !== undefined ? { rolloverCount: safeInteger(field(data, "rolloverCount", "rollover_count"), "rollover_count") } : {}),
   };
 }
+function normalizeBookSide(rows: unknown[], tokenId: string, side: "BID" | "ASK"): OrderBookLevel[] {
+  const levels = new Map<string, OrderBookLevel>();
+  for (const row of rows) {
+    const raw = object(row);
+    let level: OrderBookLevel;
+    if (raw.price !== undefined) {
+      level = {
+        pricePerUnit: uint(raw.price, "price"),
+        remainingAmount: uint(raw.amount, "amount"),
+        orderCount: safeInteger(raw.orders, "orders"),
+      };
+    } else {
+      const order = normalizeOrder(raw);
+      if (order.orderType !== side || order.tokenId !== tokenId) throw new Error("Sổ lệnh có lệnh sai phía mua/bán hoặc khác lô.");
+      level = { pricePerUnit: order.pricePerUnit, remainingAmount: order.remainingAmount, orderCount: 1 };
+    }
+    if (BigInt(level.pricePerUnit) <= 0n || BigInt(level.remainingAmount) <= 0n || level.orderCount <= 0) {
+      throw new Error("Mức giá trong sổ lệnh phải có giá, khối lượng và số lệnh dương.");
+    }
+    const key = BigInt(level.pricePerUnit).toString();
+    const prior = levels.get(key);
+    levels.set(key, {
+      pricePerUnit: key,
+      remainingAmount: (BigInt(prior?.remainingAmount ?? "0") + BigInt(level.remainingAmount)).toString(),
+      orderCount: safeInteger((BigInt(prior?.orderCount ?? 0) + BigInt(level.orderCount)).toString(), "orders"),
+    });
+  }
+  return [...levels.values()].sort((a, b) => {
+    const delta = BigInt(a.pricePerUnit) - BigInt(b.pricePerUnit);
+    return delta === 0n ? 0 : (delta > 0n ? 1 : -1) * (side === "BID" ? -1 : 1);
+  });
+}
+
+export function normalizeOrderBook(value: unknown, tokenId: string, eventTokenId?: unknown): OrderBookSnapshot {
+  const data = object(value);
+  const returnedId = field(data, "tokenId", "token_id");
+  if ([returnedId, eventTokenId].some(id => id !== undefined && uint(id, "token_id") !== tokenId)) {
+    throw new Error("API trả sổ lệnh của token khác.");
+  }
+  if (!Array.isArray(data.bids) || !Array.isArray(data.asks)) throw new Error("API thiếu bids/asks.");
+  const lastPrice = field(data, "lastClearingPrice", "last_clearing_price");
+  return {
+    tokenId, bids: normalizeBookSide(data.bids, tokenId, "BID"), asks: normalizeBookSide(data.asks, tokenId, "ASK"),
+    ...(lastPrice !== undefined ? { lastClearingPrice: uint(lastPrice, "last_clearing_price") } : {}),
+  };
+}
 function describeError(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.map(item => typeof item === "object" && item ? String((item as JsonObject).msg ?? "Dữ liệu không hợp lệ") : String(item)).join("; ");
@@ -76,8 +129,9 @@ export class MatchingApiClient {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await this.fetcher(`${this.baseUrl}/api/v1${path}`, {
-        method, headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}), cache: "no-store",
+        method, signal: controller.signal,
+        ...(body !== undefined ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+        cache: "no-store",
       });
       const payload: unknown = await response.json();
       const data = object(payload);
@@ -90,10 +144,14 @@ export class MatchingApiClient {
   }
   submitOrder(order: SignedOrder): Promise<ApiResponse<SubmitOrderResponse>> {
     return this.request("POST", "/orders", {
-      order_id: order.orderId, trader: order.trader, order_type: order.orderType,
-      token_id: order.tokenId, amount: order.amount, price_per_unit: order.pricePerUnit,
-      time_in_force: order.timeInForce, nonce: order.nonce, deadline: order.deadline,
-      signature: order.signature, chain_id: order.chainId, verifying_contract: order.verifyingContract,
+      order: {
+        orderId: order.orderId, trader: order.trader, orderType: order.orderType,
+        tokenId: order.tokenId, amount: order.amount, pricePerUnit: order.pricePerUnit,
+        nonce: order.nonce, deadline: order.deadline,
+        ...(order.signsTimeInForce ? { timeInForce: order.timeInForce } : {}),
+      },
+      signature: order.signature,
+      time_in_force: order.timeInForce === TimeInForce.IOC ? "IOC" : "GTC",
     }, value => {
       const data = object(value);
       const orderId = string(field(data, "orderId", "order_id"), "order_id");
@@ -115,28 +173,24 @@ export class MatchingApiClient {
     });
   }
   getOrderBook(tokenId: string): Promise<ApiResponse<OrderBookSnapshot>> {
-    return this.request("GET", `/orderbook/${encodeURIComponent(tokenId)}`, undefined, value => {
-      const data = object(value);
-      const returnedId = field(data, "tokenId", "token_id");
-      if (returnedId !== undefined && uint(returnedId, "token_id") !== tokenId) throw new Error("API trả sổ lệnh của token khác.");
-      if (!Array.isArray(data.bids) || !Array.isArray(data.asks)) throw new Error("API thiếu bids/asks.");
-      const bids = data.bids.map(normalizeOrder), asks = data.asks.map(normalizeOrder);
-      if (bids.some(order => order.orderType !== "BID") || asks.some(order => order.orderType !== "ASK")) throw new Error("API đặt lệnh sai phía mua/bán.");
-      if ([...bids, ...asks].some(order => order.tokenId !== tokenId)) throw new Error("Sổ lệnh chứa tokenId khác; khớp chéo token chưa được bật.");
-      const lastPrice = field(data, "lastClearingPrice", "last_clearing_price");
-      return { tokenId, bids, asks, ...(lastPrice !== undefined ? { lastClearingPrice: uint(lastPrice, "last_clearing_price") } : {}) };
-    });
+    return this.request("GET", `/orderbook/${encodeURIComponent(tokenId)}`, undefined, value => normalizeOrderBook(value, tokenId));
   }
   getCurrentSession(tokenId: string): Promise<ApiResponse<CurrentSession>> {
     return this.request("GET", `/sessions/current?token_id=${encodeURIComponent(tokenId)}`, undefined, value => {
       const data = object(value);
       const phase = data.phase;
+      if (phase === undefined && data.next_session_id !== undefined && data.last_session_id !== undefined) {
+        const next = uint(data.next_session_id, "next_session_id");
+        const last = uint(data.last_session_id, "last_session_id");
+        if (BigInt(next) !== BigInt(last) + 1n) throw new Error("API trả thứ tự phiên không hợp lệ.");
+        return { mode: "manual", sessionId: next, tokenId };
+      }
       if (!["CALL", "MATCH", "SETTLE"].includes(phase as string)) throw new Error("API trả giai đoạn phiên không hợp lệ.");
       const duration = safeInteger(field(data, "durationSeconds", "duration_seconds"), "duration_seconds");
       if (duration !== 300 && duration !== 900) throw new Error("Chu kỳ phiên phải là 300 hoặc 900 giây theo ADR-001.");
       return {
-        sessionId: string(field(data, "sessionId", "session_id"), "session_id"), tokenId,
-        phase: phase as CurrentSession["phase"], durationSeconds: duration,
+        mode: "scheduled", sessionId: string(field(data, "sessionId", "session_id"), "session_id"), tokenId,
+        phase: phase as "CALL" | "MATCH" | "SETTLE", durationSeconds: duration,
         cutoffAt: safeInteger(field(data, "cutoffAt", "cutoff_at"), "cutoff_at"),
         phaseEndsAt: safeInteger(field(data, "phaseEndsAt", "phase_ends_at"), "phase_ends_at"),
       };
@@ -144,9 +198,9 @@ export class MatchingApiClient {
   }
 }
 
-export const WS_EVENTS = ["orderbook.update", "match.executed", "settlement.confirmed", "settlement.failed", "session.completed", "price.update"] as const;
+export const WS_EVENTS = ["orderbook.snapshot", "orderbook.update", "match.executed", "settlement.confirmed", "settlement.failed", "session.completed", "price.update"] as const;
 export type WSEventType = typeof WS_EVENTS[number];
-export interface WSMessage { event: WSEventType; data: unknown; timestamp?: number }
+export interface WSMessage { event: WSEventType; data: unknown; tokenId?: unknown }
 const aliases: Record<string, WSEventType> = { orderbook_update: "orderbook.update", trade_executed: "match.executed", session_completed: "session.completed", price_update: "price.update" };
 export class OrderBookWebSocket {
   private ws: WebSocket | null = null;
@@ -168,7 +222,7 @@ export class OrderBookWebSocket {
           const raw = object(JSON.parse(event.data));
           const name = typeof raw.event === "string" ? aliases[raw.event] ?? raw.event : "";
           if (!WS_EVENTS.includes(name as WSEventType)) return;
-          const message: WSMessage = { event: name as WSEventType, data: raw.data };
+          const message: WSMessage = { event: name as WSEventType, data: raw.data, tokenId: field(raw, "tokenId", "token_id") };
           this.handlers.get(message.event)?.forEach(handler => handler(message));
         } catch { /* Ignore malformed messages; REST polling remains authoritative. */ }
       };

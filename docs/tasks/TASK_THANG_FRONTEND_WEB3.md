@@ -49,7 +49,7 @@
 * **Trạng thái:** `- [ ] Chưa hoàn thành`
 * **Mô tả công việc:**
   1. Khởi chạy song song:
-     * Server FastAPI của Phi: `uvicorn system_agents.matching_engine.api_service:app --port 8000`.
+     * Từ thư mục gốc, chạy FastAPI của Phi với `python -m uvicorn --app-dir system_agents/matching_engine api_service:app --port 8000`. Xem cấu hình địa chỉ hợp đồng trong [hướng dẫn frontend](../../frontend/README.md#đặt-lệnh-và-biểu-đồ-độ-sâu-t3).
      * Ứng dụng Next.js: `npm run dev`.
   2. Kiểm thử dòng chảy thực tế trên màn hình `TradingFloor.tsx`:
      * Nhập Form: Loại lệnh (BID/ASK), Khối lượng (tCO2e), Mức giá (USDC).
@@ -92,4 +92,7 @@
 - **17/11/2026 · T.2** Modal faucet trên navbar có nút nhận 10.000 MockUSDC và 100 EVCC #101. Faucet EVCC cấp từ số dư của lô đã đúc, một lượt mỗi ví, vì `mintProjectLot` yêu cầu verifier và chỉ tạo lô #101 một lần. Đã kiểm tra lệnh mint MockUSDC bằng mô phỏng Amoy và chạy bytecode hai luồng trên EVM cục bộ.
 - **Nghiệm thu MockUSDC** Ví thử `0xF6dD…B5d5` nhận 10.000 MockUSDC trên Amoy, số dư tăng từ 100.000 lên 110.000 tại block `53080025`. [Biên nhận MockUSDC](https://amoy.polygonscan.com/tx/0x5c5f6de5c2d6248c52772b134a6636a4d7415be0e3341178be03b2ab5e553bf2)
 - **Còn chờ nghiệm thu EVCC #101** Đức đã nạp 1.000 EVCC vào faucet `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED`. Frontend đọc hợp đồng EVCC liên kết và tồn kho #101 trước khi gọi `claim()`. Cần xác nhận giao dịch trên web và đối chiếu mức tăng 100 EVCC. [Biên nhận nạp faucet](https://amoy.polygonscan.com/tx/0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d)
+- **17/11/2026 · T.3** Frontend đọc `ORDER_TYPEHASH` và `userNonces()` trên Amoy, ký theo mẫu đang triển khai, gửi `POST /api/v1/orders` qua proxy Next.js và cập nhật Depth Chart bằng dữ liệu mức giá từ WebSocket của Phi.
+- **Kiểm thử cục bộ T.3** Chrome dùng ví thử tự ký EIP-712, kết nối Next.js và FastAPI thật trên máy. Hai lệnh BID/GTC và ASK/IOC đều được API tiếp nhận với HTTP 201. Tab thứ hai cập nhật biểu đồ sau 498 ms và 366 ms kể từ lúc gửi POST, không có lỗi console. TypeScript, ESLint và 20 bài kiểm thử frontend đều đạt.
+- **Điều kiện nghiệm thu T.3** Cần xác nhận ký bằng MetaMask thật và ghi bằng chứng trên web. Khớp phiên trong FastAPI hiện chạy thủ công. GTC/IOC do Matching Engine xử lý, còn mẫu chữ ký trên Amoy hiện tại chỉ ràng buộc hạn lệnh theo `deadline` và chưa ký `timeInForce` như SRS.
 - **17/11/2026 · T.4** Đã dựng bốn mockup theo SRS và xuất ảnh PNG 2880 × 2000 px cùng nguồn SVG tại [thư mục wireframes](../wireframes/README.md). Còn chờ nhập vào Figma Design và xác minh Huy mở được link xem trước khi tích hoàn thành.
