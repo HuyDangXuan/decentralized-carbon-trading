@@ -35,6 +35,7 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -94,6 +95,10 @@ class CancelOrderRequest(BaseModel):
     deadline: int = Field(gt=0, le=UINT256_MAX)
 
 
+class SessionWindowRequest(BaseModel):
+    closes_at: Optional[int] = Field(default=None, gt=0, description="UNIX giây; null = không đặt giờ đóng")
+
+
 class RunSessionRequest(BaseModel):
     tokenId: int = Field(ge=0, le=UINT256_MAX)
 
@@ -143,6 +148,7 @@ def create_app(
     contract_address: Optional[str] = None,
     admin_key: Optional[str] = None,
     now_fn: Callable[[], float] = time.time,
+    cors_origins: Optional[list] = None,
 ) -> FastAPI:
     agent = agent or DoubleAuctionAgent(now_fn=now_fn)
     domain = {
@@ -162,6 +168,19 @@ def create_app(
 
     app = FastAPI(title="CarbonChain Matching Engine API (mock)", version="0.1.0")
     app.state.agent = agent
+
+    # CORS cho frontend (khác origin). Mặc định chỉ cho localhost dev; đặt CORS_ALLOW_ORIGINS="https://a,https://b" để đổi.
+    if cors_origins is None:
+        raw = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+        cors_origins = [o.strip() for o in raw.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-API-Key"],
+    )
+    # Giờ đóng nhận lệnh của phiên kế tiếp (tùy chọn, đặt qua POST /sessions/window); None = luôn mở.
+    window: Dict[str, Optional[int]] = {"closes_at": None}
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -321,7 +340,20 @@ def create_app(
 
     @app.get("/api/v1/sessions/current")
     async def current_session() -> dict:
-        return {"next_session_id": agent.session_id + 1, "last_session_id": agent.session_id}
+        closes_at = window["closes_at"]
+        is_open = closes_at is None or now_fn() < closes_at
+        return {
+            "next_session_id": agent.session_id + 1,
+            "last_session_id": agent.session_id,
+            "status": "open" if is_open else "closed",
+            "closes_at": closes_at,
+        }
+
+    @app.post("/api/v1/sessions/window")
+    async def set_session_window(req: SessionWindowRequest, x_api_key: Optional[str] = Header(default=None)) -> dict:
+        _require_admin(x_api_key)
+        window["closes_at"] = req.closes_at
+        return {"closes_at": req.closes_at}
 
     @app.get("/api/v1/sessions/{session_id}/matches")
     async def session_matches(session_id: int) -> dict:
