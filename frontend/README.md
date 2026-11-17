@@ -12,7 +12,19 @@ npm run dev
 
 Nếu đã có `.env.local`, cập nhật riêng `NEXT_PUBLIC_AMOY_RPC_URL` theo `.env.example`. Nếu chính tiện ích MetaMask báo không kết nối được Amoy, có thể chọn RPC đang hoạt động trong phần quản lý mạng của MetaMask. RPC của tiện ích và RPC dùng để đọc số dư trên DApp được cấu hình riêng.
 
-Module ABI đấu giá cần artifact tương thích trước khi bật chức năng ký lệnh. Xem hướng dẫn importer trong tài liệu bàn giao.
+### Đặt lệnh và biểu đồ độ sâu (T.3)
+
+Chạy FastAPI từ thư mục gốc của repo bằng Python 3.12. Cài các dependency của Matching Engine và hỗ trợ WebSocket. Đặt `AUCTION_CONTRACT_ADDRESS` theo địa chỉ `CarbonDoubleAuction` trên Amoy trong [tài liệu bàn giao](../docs/DEPLOYED_ADDRESSES.md).
+
+```powershell
+python -m pip install -r system_agents/matching_engine/requirements.txt "uvicorn[standard]==0.54.0"
+$env:AUCTION_CONTRACT_ADDRESS = '0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f'
+python -m uvicorn --app-dir system_agents/matching_engine api_service:app --host 127.0.0.1 --port 8000
+```
+
+Khởi động frontend từ thư mục `frontend`. Next.js chuyển tiếp yêu cầu REST tới `MATCHING_API_URL` trên máy chủ. Trình duyệt dùng `NEXT_PUBLIC_MATCHING_WS_URL` để nhận sổ lệnh qua WebSocket. Cả hai biến có giá trị mẫu trong `.env.example`.
+
+Kết nối MetaMask trên Amoy, nhập lệnh mua hoặc bán và ký EIP-712. FastAPI tiếp nhận lệnh và phát sổ lệnh mới theo mức giá. Kiểm tra thông báo thành công và biểu đồ độ sâu ở tab thứ hai. Bản API hiện tại khớp phiên thủ công. Hợp đồng Amoy xác minh hạn lệnh đã ký và Matching Engine xử lý GTC/IOC ngoài chuỗi. Sai khác với yêu cầu ký `timeInForce` được theo dõi trong [đặc tả Matching Engine](../docs/MATCHING_ENGINE_SPEC.md).
 
 ### Faucet thử nghiệm (T.2)
 

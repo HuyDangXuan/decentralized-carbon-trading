@@ -1,20 +1,14 @@
 import { microUsdcToUsd } from "../lib/orders";
-import type { OrderBookSnapshot, OrderBookEntry } from "../services/matchingApi";
+import type { OrderBookSnapshot, OrderBookLevel } from "../services/matchingApi";
 
-function cumulative(orders: OrderBookEntry[], descending: boolean) {
-  const levels = new Map<bigint, bigint>();
-  for (const order of orders) {
-    const price = BigInt(order.pricePerUnit);
-    levels.set(price, (levels.get(price) ?? 0n) + BigInt(order.remainingAmount));
-  }
+function cumulative(levels: OrderBookLevel[]) {
   let volume = 0n;
-  return [...levels].sort(([a], [b]) => a === b ? 0 : (a > b ? 1 : -1) * (descending ? -1 : 1))
-    .map(([price, amount]) => ({ price, volume: volume += amount }));
+  return levels.map(level => ({ price: BigInt(level.pricePerUnit), volume: volume += BigInt(level.remainingAmount) }));
 }
 
 export function DepthChart({ book }: { book: OrderBookSnapshot | null }) {
   if (!book || book.bids.length + book.asks.length === 0) return null;
-  const bids = cumulative(book.bids, true), asks = cumulative(book.asks, false);
+  const bids = cumulative(book.bids), asks = cumulative(book.asks);
   const points = [...bids, ...asks];
   const min = points.reduce((value, point) => point.price < value ? point.price : value, points[0].price);
   const max = points.reduce((value, point) => point.price > value ? point.price : value, points[0].price);
