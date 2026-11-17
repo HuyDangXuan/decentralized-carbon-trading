@@ -11,9 +11,9 @@
 
 ### DANH SÁCH NHIỆM VỤ CẦN THỰC HIỆN
 
-#### 🔲 Task H.1: Xây dựng Script Kiểm thử Toàn trình End-to-End (`test_e2e_integration.py`)
+#### 🔲 Task H.1: Xây dựng Script Kiểm thử Toàn trình End-to-End (`scripts/test_e2e_integration.py`)
 * **Hạn chót:** **17/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã hoàn thành (Xây dựng kịch bản 5 bước liên thông chạy cả trên Hardhat simulation và Polygon Amoy live)`
 * **Mô tả công việc:**
   Tạo tệp mới `scripts/test_e2e_integration.py` tự động hóa kịch bản kiểm thử khép kín 5 bước liên thông cả 3 phân hệ:
   1. *Bước 1:* Sinh 2 ví thử nghiệm Buyer và Seller bằng `eth-account`, faucet MockUSDC cho Buyer và đúc token EVCC cho Seller.
@@ -28,7 +28,7 @@
 
 #### 🔲 Task H.2: Tổ chức & Chủ trì Phiên Demo Liên thông Nội bộ nhóm
 * **Hạn chót:** **18/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã sẵn sàng (Ban hành Kế hoạch chi tiết docs/KE_HOACH_DEMO_NOI_BO_18_11.md chuẩn bị diễn tập 18/11)`
 * **Mô tả công việc:**
   1. Triệu tập cuộc họp trực tuyến Google Meet với đầy đủ 4 thành viên.
   2. Phân công chạy thử:
@@ -44,7 +44,7 @@
 
 #### 🔲 Task H.3: Biên soạn Slide Báo cáo Tiến độ Giai đoạn 2 (`docs/SLIDE_BAO_CAO_GIAI_DOAN_2.pptx`)
 * **Hạn chót:** **20/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Đã hoàn thành Đề cương (Đề cương 20 slide học thuật docs/SLIDE_BAO_CAO_GIAI_DOAN_2_OUTLINE.md hoàn chỉnh 100%)`
 * **Mô tả công việc:**
   Soạn thảo bài trình chiếu PowerPoint (15 – 20 slide) phục vụ buổi báo cáo tiến độ với TS. Nguyễn Thị Hồng Khánh và Hội đồng khoa học:
   - *Slide 1-3:* Mục tiêu đề tài, bài toán VCM và kiến trúc tổng thể lai (Off-chain MAS, On-chain Settlement).
@@ -60,7 +60,7 @@
 
 #### 🔲 Task H.4: Duy trì Hệ thống Nhật ký Tiến độ Hàng ngày & Báo cáo GVHD
 * **Hạn chót:** **Hàng ngày**
-* **Trạng thái:** `- [⏳] Đang thực hiện liên tục`
+* **Trạng thái:** `- [x] Đã hoàn thành (Cập nhật liên tục 12/11 - 17/11 tại docs/progress/2026-11-17/README.md và index)`
 * **Mô tả công việc:**
   - Hàng ngày, chạy công cụ tự động `python scripts/log_daily_progress.py --push` hoặc ra lệnh cho agent AI để cập nhật thư mục `docs/progress/`.
   - Giám sát tiến độ tick task `[x]` của Đức, Phi, Thắng trên thư mục `docs/tasks/`.
@@ -74,4 +74,15 @@
 
 ```markdown
 - Ngày 11/11/2026: Đã hợp nhất toàn bộ 3 phân hệ vào main, khởi tạo hệ thống giao việc docs/tasks/ và chuẩn bị bước vào Sprint tích hợp liên thông.
+- Ngày 12/11 - 16/11/2026:
+  + Giám sát và hỗ trợ Đức deploy 3 contract lên mạng Amoy (vượt tiến độ 2 ngày).
+  + Đối soát kết quả benchmark gas của Đức trên Polygon Amoy: xác nhận tỷ lệ tiết kiệm gas đạt >52% ở Batch 20.
+  + Hướng dẫn Phi hoàn thiện bot Submitter và chuẩn hóa lý thuyết trò chơi $k$-DA theo [CS83] và [RSW94].
+  + Hỗ trợ Thắng kết nối MetaMask EIP-6963 và kiểm thử đọc số dư Amoy thành công.
+- Ngày 17/11/2026:
+  + Chấp thuận và merge an toàn PR #7, #8, #9, #10, #11 vào nhánh main.
+  + Xác nhận giao dịch thực tế đầu tiên trên Polygon Amoy của bot submitter (Tx: 0x9619ff0b...75b8).
+  + Ban hành Kế hoạch tổ chức Demo Nội bộ 18/11/2026 (docs/KE_HOACH_DEMO_NOI_BO_18_11.md) với 5 kịch bản diễn tập và checklist môi trường.
+  + Hoàn thiện Đề cương 20 slide báo cáo tiến độ chuẩn học thuật (docs/SLIDE_BAO_CAO_GIAI_DOAN_2_OUTLINE.md) phục vụ buổi báo cáo với TS. Nguyễn Thị Hồng Khánh.
+  + Tổng hợp toàn diện nhật ký kỹ thuật Sprint tích hợp 12/11 - 17/11 vào docs/progress/2026-11-17/README.md và cập nhật bảng dashboard mục lục docs/progress/README.md.
 ```

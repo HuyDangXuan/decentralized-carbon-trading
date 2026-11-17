@@ -13,10 +13,10 @@
 
 | Thành viên | Phân hệ chuyên trách | Tệp giao việc cá nhân | Trạng thái hiện tại |
 | :--- | :--- | :---: | :---: |
-| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`TASK_DUC_SMART_CONTRACT.md`](TASK_DUC_SMART_CONTRACT.md) | 🟡 **ĐANG THỰC HIỆN** |
-| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`TASK_PHI_AUCTION_ENGINE.md`](TASK_PHI_AUCTION_ENGINE.md) | 🟡 **ĐANG THỰC HIỆN** |
-| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟡 **ĐANG THỰC HIỆN** |
-| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`TASK_HUY_LEAD_COORDINATION.md`](TASK_HUY_LEAD_COORDINATION.md) | 🟡 **ĐANG THỰC HIỆN** |
+| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`TASK_DUC_SMART_CONTRACT.md`](TASK_DUC_SMART_CONTRACT.md) | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ (Đ.1 – Đ.4)** |
+| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`TASK_PHI_AUCTION_ENGINE.md`](TASK_PHI_AUCTION_ENGINE.md) | 🟢 **HOÀN THÀNH P.1, P.3, P.4 (P.2 ĐANG MỞ RỘNG)** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH T.1, T.2, T.4 (T.3 SẴN SÀNG DEMO)** |
+| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`TASK_HUY_LEAD_COORDINATION.md`](TASK_HUY_LEAD_COORDINATION.md) | 🟢 **HOÀN THÀNH H.1, H.2, H.3, H.4** |
 
 ---
 
@@ -24,22 +24,22 @@
 
 | Mã Task | Hạng mục công việc chi tiết | Phụ trách | Hạn chót | Trạng thái | Sản phẩm bàn giao |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **Đ.1** | Cài đặt môi trường `npm install` & Chạy test Hardhat local | Đức | 12/11 | [ ] Chưa xong | 100% tests `CarbonTrading.test.js` pass |
-| **Đ.2** | Deploy 3 Smart Contracts lên mạng Polygon Amoy Testnet | Đức | 14/11 | [ ] Chưa xong | 3 Contract verified trên PolygonScan |
-| **Đ.3** | Tạo tệp `docs/DEPLOYED_ADDRESSES.md` cấp địa chỉ cho nhóm | Đức | 14/11 | [ ] Chưa xong | Tệp `docs/DEPLOYED_ADDRESSES.md` |
-| **Đ.4** | Đo lường và cập nhật Benchmark Gas thực tế trên Amoy | Đức | 16/11 | [ ] Chưa xong | Cập nhật Mục 5 `SMART_CONTRACT_SPEC.md` |
-| **P.1** | Viết Bot Settlement Submitter (`settlement_submitter.py`) | Phi | 15/11 | [ ] Chưa xong | Module nộp `batchSettleTrades` on-chain |
-| **P.2** | Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$) | Phi | 17/11 | [ ] Chưa xong | Đồ thị log-log $O(1/m^2)$ trong `simulation/` |
-| **P.3** | Biên soạn Tài liệu Đe dọa Bảo mật `docs/THREAT_MODELING.md` | Phi | 18/11 | [ ] Chưa xong | Tệp `docs/THREAT_MODELING.md` hoàn chỉnh |
-| **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [ ] Chưa xong | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` |
-| **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; số dư EVCC và MockUSDC khớp blockchain |
-| **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [ ] Chưa xong | Component `FaucetModal.tsx` trên giao diện |
-| **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [ ] Chưa xong | Đặt lệnh hiển thị Depth Chart $< 1$s |
-| **T.4** | Hoàn thiện Bộ thiết kế Wireframe Figma 4 phân hệ DApp | Thắng | 20/11 | [ ] Chưa xong | Thư mục `docs/wireframes/` & Link Figma |
-| **H.1** | Viết script kiểm thử toàn trình `scripts/test_e2e_integration.py` | Huy | 17/11 | [ ] Chưa xong | Script test 5 bước khép kín tự động |
-| **H.2** | Triệu tập và chủ trì phiên Demo Liên thông Nội bộ nhóm | Huy | 18/11 | [ ] Chưa xong | Biên bản họp Google Meet & Test log |
-| **H.3** | Biên soạn Slide Báo cáo Tiến độ Giai đoạn 2 (15 - 20 trang) | Huy | 20/11 | [ ] Chưa xong | File `docs/SLIDE_BAO_CAO_GIAI_DOAN_2.pptx` |
-| **H.4** | Duy trì nhật ký tiến độ hàng ngày và báo cáo với GVHD | Huy | Hàng ngày | [⏳] Đang làm | `docs/progress/` cập nhật liên tục |
+| **Đ.1** | Cài đặt môi trường `npm install` & Chạy test Hardhat local | Đức | 12/11 | [x] Hoàn thành | 14/14 tests `CarbonTrading.test.js` PASS 100% |
+| **Đ.2** | Deploy 3 Smart Contracts lên mạng Polygon Amoy Testnet | Đức | 14/11 | [x] Hoàn thành | 3 Contracts verified trên PolygonScan (vượt 2 ngày) |
+| **Đ.3** | Tạo tệp `docs/DEPLOYED_ADDRESSES.md` cấp địa chỉ cho nhóm | Đức | 14/11 | [x] Hoàn thành | Tệp `docs/DEPLOYED_ADDRESSES.md` bàn giao nhóm |
+| **Đ.4** | Đo lường và cập nhật Benchmark Gas thực tế trên Amoy | Đức | 16/11 | [x] Hoàn thành | Cập nhật Mục 5 `SMART_CONTRACT_SPEC.md` (>52% gas savings) |
+| **P.1** | Viết Bot Settlement Submitter (`settlement_submitter.py`) | Phi | 15/11 | [x] Hoàn thành | Bot chạy thật thành công trên Amoy (Tx: `0x9619ff0b...75b8`) |
+| **P.2** | Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$) | Phi | 17/11 | [⏳] Đang mở rộng | Script `equilibrium_crosscheck.py` & số liệu tạm thời $m \le 64$ |
+| **P.3** | Biên soạn Tài liệu Đe dọa Bảo mật `docs/THREAT_MODELING.md` | Phi | 18/11 | [x] Hoàn thành | Tệp `docs/THREAT_MODELING.md` qua review độc lập |
+| **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [x] Hoàn thành | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` chuẩn [CS83], [RSW94] |
+| **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; đọc số dư EVCC và MockUSDC chính xác |
+| **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [x] Hoàn thành | Component `FaucetModal.tsx`, nhận MockUSDC thật trên Amoy |
+| **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [⏳] Sẵn sàng demo | Luồng đặt lệnh và vẽ Depth Chart sẵn sàng cho phiên 18/11 |
+| **T.4** | Hoàn thiện Bộ thiết kế Wireframe Figma 4 phân hệ DApp | Thắng | 20/11 | [x] Hoàn thành | Thư mục `docs/wireframes/` (4 PNG 2880x2000 & 4 SVG vector) |
+| **H.1** | Viết script kiểm thử toàn trình `scripts/test_e2e_integration.py` | Huy | 17/11 | [x] Hoàn thành | Script test 5 bước khép kín tự động (Hardhat & Amoy) |
+| **H.2** | Triệu tập và chủ trì phiên Demo Liên thông Nội bộ nhóm | Huy | 18/11 | [x] Đã sẵn sàng | Tệp `docs/KE_HOACH_DEMO_NOI_BO_18_11.md` 5 kịch bản diễn tập |
+| **H.3** | Biên soạn Slide Báo cáo Tiến độ Giai đoạn 2 (15 - 20 trang) | Huy | 20/11 | [x] Hoàn thành Đề cương | File `docs/SLIDE_BAO_CAO_GIAI_DOAN_2_OUTLINE.md` 20 slide chuẩn |
+| **H.4** | Duy trì nhật ký tiến độ hàng ngày và báo cáo với GVHD | Huy | Hàng ngày | [x] Hoàn thành | `docs/progress/2026-11-17/README.md` cập nhật trọn vẹn 12-17/11 |
 
 ---
 

@@ -8,7 +8,7 @@ Nhánh làm việc: `feat/phi-settlement-submitter-bot`, đã push lên `origin/
 | --- | --- | --- |
 | P.1 Bot settlement | `system_agents/matching_engine/settlement_submitter.py`, test, `docs/SETTLEMENT_SUBMITTER_GUIDE.md` | Test local và e2e pass. **Đã chạy thật trên Amoy 17/11/2026**: 1 trade `SETTLED`, TxHash `0x9619ff0b…75b8`, số dư hai ví khớp. Chi tiết: `docs/SETTLEMENT_SUBMITTER_GUIDE.md`, mục "Kết quả chạy thật trên Amoy". |
 | P.3 Threat modeling | `docs/THREAT_MODELING.md` | Đã qua review độc lập, các phát hiện đã tự kiểm trước khi tích hợp. |
-| P.4 Chuẩn hóa theo paper | `docs/MATCHING_ENGINE_SPEC.md` | H4 xong; H7 làm rõ tên; H7 A/B và H8 chờ Huy. |
+| P.4 Chuẩn hóa theo paper | `docs/MATCHING_ENGINE_SPEC.md` | H4 xong; **H7**: Huy đã phê duyệt Phương án A (chuẩn hóa tên kỹ thuật là `marginal` theo ADR-001); **H8**: Huy đã xác nhận vòng đời GTC tối đa 3 phiên (`max_rollover = 2`). |
 | P.2 Thực nghiệm C mở rộng | `export_strategies_c.py`, `run_experiment_c_multiunit.py`, `results/exp_c_*`, spec §9.5 | Xem giới hạn bên dưới. |
 
 ## P.2 vẫn đang chạy thử (sẽ cập nhật ở phiên sau)
@@ -44,7 +44,8 @@ Phi vẫn đang chạy thử Thực nghiệm C ở các mức tham số khác (m
 
 | Việc | Chờ ai | Trạng thái |
 | --- | --- | --- |
-| H7 A/B, H8, H10 | Huy | Chưa có trả lời. Huy đã xác nhận cứ push ở nhánh hiện tại. |
+| H7 A/B, H8 | Huy | ✅ **Đã giải quyết (17/11/2026)**: Huy (Lead Architect) chốt Phương án A cho H7 (xác nhận tên gọi kỹ thuật chính thức là `marginal`, giữ nguyên công thức ADR-001 $P^* = \lfloor(b_M + s_M)/2\rfloor$ và `PRICING_RULE = "marginal"`); xác nhận H8 (vòng đời GTC tối đa 3 phiên, `max_rollover = 2` tương ứng 3 phiên). |
+| H10 | Huy | ✅ Huy đã xác nhận tiếp tục push ở nhánh hiện tại. |
 | Deadline P.3 (18/11 hay 20/11), tổng thể (20/11 hay 25/11) | Huy | Kế hoạch ghi hai mốc khác nhau. |
 | Lỗi hợp đồng: `cancelOrder` kiểm soát truy cập, `tradeHash` thiếu `sessionId`, giới hạn gas từng trade, tách ví Operator khỏi deployer, tên sự kiện cũ trong SRS | Đức | Đã ghi trong `docs/THREAT_MODELING.md` và guide của bot. |
 
