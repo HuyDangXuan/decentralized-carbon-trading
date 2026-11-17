@@ -58,7 +58,10 @@
 
 ### 3.2 Dành cho bạn Nguyễn Bảo Phi (Auction Matching & Submitter Bot)
 1. **Cấu hình bot thanh toán on-chain:** Bot nộp kết quả khớp lệnh gọi hàm `batchSettleTrades` vào hợp đồng `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`.
-2. **Quyền hạn:** Để ví bot của Phi có thể gọi hàm settlement, Đức đã cấp sẵn quyền `SETTLEMENT_OPERATOR_ROLE` cho deployer và có thể cấp thêm cho địa chỉ ví bot của Phi khi Phi gửi địa chỉ ví.
+2. **Quyền hạn:** Đã cấp quyền `SETTLEMENT_OPERATOR_ROLE` chính thức cho địa chỉ ví bot của Phi:
+   - **Địa chỉ ví Bot:** `0xa4b198e0f6EB111F6B1dcc1c898C024222240EDE`
+   - **Trạng thái:** ✅ Đã cấp quyền on-chain (Verified). Ví bot có thể trực tiếp gọi `batchSettleTrades` và `settleMatchedTrade`.
+   - **Tài trợ phí gas:** Đã chuyển POL vào ví bot để đảm bảo thực thi tự động.
 
 ---
 
