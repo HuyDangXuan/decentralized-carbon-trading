@@ -33,6 +33,13 @@ Giao dịch `batchSettleTrades` vẫn thành công khi có trade lỗi bên tron
    ```
    Lệnh chỉ in địa chỉ ví; khóa riêng được ghi vào `.env` ở gốc repo (file đã nằm trong `.gitignore`, không commit).
 3. Gửi địa chỉ ví cho Đức để cấp `SETTLEMENT_OPERATOR_ROLE` (`grantRole`), và nạp POL từ faucet Amoy cho ví này để trả gas.
+
+### Dùng chung trong nhóm: mỗi người tự tạo ví Operator của mình
+
+- **Không commit, không đẩy `.env` hoặc khóa riêng lên git.** Repo này công khai; khóa đã lên GitHub là coi như lộ vĩnh viễn (lịch sử git không xóa được). Ví giữ `SETTLEMENT_OPERATOR_ROLE` thì ai có khóa cũng ký được `batchSettleTrades`; lộ khóa thì Đức phải thu hồi role.
+- Thành viên nào cần chạy bot thì chạy bước 2 ở trên để tạo ví riêng, gửi **địa chỉ** (không phải khóa) cho Đức cấp role, rồi xin POL (faucet Polygon Amoy hoặc nhờ Đức).
+- Khi demo, một người chạy bot trên máy của mình; các thành viên khác dùng API và frontend, không cần khóa.
+- Nếu buộc phải chuyển khóa, gửi riêng tư cho đúng người, không qua git hay kênh chung.
 4. Địa chỉ hợp đồng lấy từ `docs/DEPLOYED_ADDRESSES.md` (do Đức bàn giao).
 
 ## Chạy
