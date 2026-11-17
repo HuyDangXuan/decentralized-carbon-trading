@@ -21,6 +21,7 @@ class Order:
     signature: Optional[str] = None  # Chữ ký số EIP-712 xác thực từ ví người dùng
     time_in_force: str = "GTC"       # "GTC" | "IOC" (ADR-001, Quyết định 4)
     deadline: Optional[int] = None   # Unix time hết hạn chữ ký (giây); None = không giới hạn
+    nonce: Optional[int] = None      # nonce trong chữ ký EIP-712 (uint256); bot settlement cần để dựng lại struct on-chain
 
 @dataclass
 class MatchResult:

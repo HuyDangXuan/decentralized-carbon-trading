@@ -62,6 +62,9 @@ class OrderRecord:
     remaining_amount: int
     rollover_count: int = 0
     filled_amount: int = 0
+    # Khối lượng đã có bằng chứng thanh toán on-chain (event TradeSettled). `filled_amount` là khối lượng
+    # engine đã khớp; hai số này lệch nhau khi settlement chưa chạy hoặc bị bỏ qua trong batch.
+    settled_amount: int = 0
     status: OrderStatus = OrderStatus.NEW
 
 
@@ -127,6 +130,18 @@ class DoubleAuctionAgent:
 
     def get_order(self, order_id: str) -> OrderRecord:
         return self._records[order_id]
+
+    def confirm_settlement(self, order_id: str, amount: int) -> OrderRecord:
+        """Ghi nhận `amount` đã được thanh toán on-chain cho lệnh. Không bao giờ vượt `filled_amount`."""
+        record = self._records[order_id]
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+            raise ValueError(f"amount must be a positive integer, got {amount!r}")
+        if record.settled_amount + amount > record.filled_amount:
+            raise ValueError(
+                f"order {order_id}: settled {record.settled_amount} + {amount} exceeds filled {record.filled_amount}"
+            )
+        record.settled_amount += amount
+        return record
 
     def snapshot(self, token_id: int) -> Dict[str, List[Dict[str, int]]]:
         """Độ sâu sổ lệnh theo mức giá: bids giảm dần, asks tăng dần."""

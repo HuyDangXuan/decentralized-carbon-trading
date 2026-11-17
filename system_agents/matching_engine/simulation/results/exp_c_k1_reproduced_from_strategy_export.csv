@@ -1,0 +1,11 @@
+k,m,rule,loss,loss_ci95,converged
+1,8,pair,2.705563e-02,1.9e-04,False
+1,8,marginal,1.041981e-02,5.8e-05,False
+1,8,kda,4.061265e-03,2.7e-05,False
+1,16,pair,1.449365e-02,1.0e-04,False
+1,16,marginal,3.066372e-03,1.5e-05,False
+1,16,kda,9.288628e-04,7.1e-06,False
+1,32,pair,6.789015e-03,4.1e-05,True
+1,32,marginal,8.686101e-04,5.7e-06,False
+1,64,pair,4.123804e-03,2.7e-05,True
+1,64,marginal,1.958333e-04,5.4e-07,False
