@@ -35,6 +35,7 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -161,6 +162,13 @@ def create_app(
             raise HTTPException(401, "missing or wrong X-API-Key")
 
     app = FastAPI(title="CarbonChain Matching Engine API (mock)", version="0.1.0")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.agent = agent
 
     @app.exception_handler(RequestValidationError)
@@ -320,8 +328,37 @@ def create_app(
         return {"session_id": agent.session_id, "matches": payload}
 
     @app.get("/api/v1/sessions/current")
-    async def current_session() -> dict:
-        return {"next_session_id": agent.session_id + 1, "last_session_id": agent.session_id}
+    async def current_session(token_id: Optional[str] = None) -> dict:
+        now = int(now_fn())
+        cycle = 300  # 5 phút chu kỳ theo ADR-001 demo
+        elapsed = now % cycle
+        if elapsed < 270:
+            phase = "CALL"
+            cutoff_at = now + (270 - elapsed)
+            phase_ends_at = now + (270 - elapsed)
+        elif elapsed < 285:
+            phase = "MATCH"
+            cutoff_at = now - (elapsed - 270)
+            phase_ends_at = now + (285 - elapsed)
+        else:
+            phase = "SETTLE"
+            cutoff_at = now - (elapsed - 270)
+            phase_ends_at = now + (300 - elapsed)
+
+        return {
+            "session_id": str(agent.session_id + 1),
+            "sessionId": str(agent.session_id + 1),
+            "next_session_id": agent.session_id + 1,
+            "last_session_id": agent.session_id,
+            "phase": phase,
+            "duration_seconds": 300,
+            "durationSeconds": 300,
+            "cutoff_at": cutoff_at,
+            "cutoffAt": cutoff_at,
+            "phase_ends_at": phase_ends_at,
+            "phaseEndsAt": phase_ends_at,
+            "token_id": token_id or "101",
+        }
 
     @app.get("/api/v1/sessions/{session_id}/matches")
     async def session_matches(session_id: int) -> dict:
