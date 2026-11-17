@@ -78,4 +78,20 @@ Kết quả kiểm là ảnh chụp tại thời điểm đọc: trader vẫn c�
 - Kiểm số dư và allowance chỉ là ảnh chụp trước khi gửi; hợp đồng không khóa tài sản nên trader vẫn có thể rút giữa chừng (trade thành `FAILED`, mục 5.6 của `docs/THREAT_MODELING.md`). Bot chưa đặt giới hạn gas riêng cho từng trade (cần sửa hợp đồng: `try this.executeSettlementExternal{gas: ...}`) và chưa tránh dùng `estimateGas` khi batch có bên mua có mã được cho phép bằng `--allow-contract-traders`.
 - `tradeHash` của hợp đồng không có `sessionId`: khớp lại đúng cặp lệnh, đúng khối lượng và giá ở phiên sau bị hợp đồng từ chối (`TradeAlreadyExecuted`); bot phát hiện qua `executedTrades` và đặt `SKIPPED`. Cần Đức xem xét (xem `docs/THREAT_MODELING.md`, mục 3.2).
 - Engine chưa có trạng thái `PENDING_SETTLEMENT` (spec mục 4): `filled_amount` là khối lượng đã khớp, `settled_amount` là phần có bằng chứng on-chain; hai số có thể lệch.
-- Chưa chạy trên Amoy thật cho tới khi ví Operator được cấp quyền.
+- Đã chạy thật trên Amoy một phiên một trade (17/11/2026, mục dưới). Chưa thử trên chuỗi: batch nhiều trade, trade `FAILED`, hết giờ chờ biên nhận, `--recover-tx`.
+
+## Kết quả chạy thật trên Amoy (17/11/2026)
+
+Cấu hình: hợp đồng `CarbonDoubleAuction` `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`, `MockUSDC` `0xe35681b0882d533458d22B344268642136ebD813`, `CarbonCredit1155` `0x851978601b47a61B8aF3bcC1707B689Fbc977697` (theo `docs/DEPLOYED_ADDRESSES.md` của Đức). Ví Operator `0xa4b198e0f6EB111F6B1dcc1c898C024222240EDE` (đã có `SETTLEMENT_OPERATOR_ROLE`, xác minh bằng `hasRole` trả về true).
+
+Kịch bản: hai ví thử, bên mua `0xA4405ECe027f9C0585764b97b3E96dA947b52E7d` (50.000 MockUSDC) và bên bán `0x485ed29E56A57c59ca817554950C4C19EB00aF0c` (50 tín chỉ lô 101), do Đức cấp tài sản. Hai bên approve cho hợp đồng; engine nhận lệnh mua 5 đơn vị giá 11 USDC và lệnh bán 5 đơn vị giá 9 USDC (chữ ký EIP-712), khớp 5 đơn vị ở giá 10 USDC.
+
+| Bước | Kết quả |
+| --- | --- |
+| `--dry-run` | 1 trade sẽ gửi, 0 bị bỏ |
+| Gửi thật | TxHash `0x9619ff0b986145c8c2c2ce7e49c49f4fe639fbf2faa42b2a88d64a050bca75b8`, `status` 1, gas 275.741, event `TradeSettled`, trade `SETTLED`, engine ghi nhận |
+| Số dư trên chain sau đó | Bên mua: USDC 50.000 → 49.950, tín chỉ 0 → 5. Bên bán: tín chỉ 50 → 45, USDC 0 → 50 |
+
+Lỗi tìm thấy khi chạy thật và đã sửa: Amoy là chuỗi PoA (`extraData` 104 byte) nên web3 báo `ExtraDataLengthError` khi đọc block; `Web3Chain.from_rpc` giờ bật `ExtraDataToPOAMiddleware`. Test local dùng chuỗi giả nên không bắt được lỗi này. Bot dừng ở bước khởi động, chưa gửi giao dịch nào khi lỗi.
+
+Lưu ý khi chạy lại: bot đọc khóa từ biến môi trường, không tự đọc `.env`. RPC `poly-amoy-testnet.api.pocket.network` (mặc định) chưa được kiểm; lần chạy dùng `https://polygon-amoy-bor-rpc.publicnode.com`. Engine giữ phiên trong bộ nhớ nên khởi động lại thì số phiên về 1; do `tradeHash` không có `sessionId`, nộp lại đúng cặp lệnh, khối lượng và giá sẽ bị từ chối.
