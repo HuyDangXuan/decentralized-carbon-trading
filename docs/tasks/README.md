@@ -15,7 +15,7 @@
 | :--- | :--- | :---: | :---: |
 | **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`TASK_DUC_SMART_CONTRACT.md`](TASK_DUC_SMART_CONTRACT.md) | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ (Đ.1 – Đ.4)** |
 | **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`TASK_PHI_AUCTION_ENGINE.md`](TASK_PHI_AUCTION_ENGINE.md) | 🟢 **HOÀN THÀNH P.1, P.3, P.4 (P.2 ĐANG MỞ RỘNG)** |
-| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH T.1, T.2, T.4 (T.3 SẴN SÀNG DEMO)** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH T.2, T.4 (T.3 SẴN SÀNG DEMO)** |
 | **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`TASK_HUY_LEAD_COORDINATION.md`](TASK_HUY_LEAD_COORDINATION.md) | 🟢 **HOÀN THÀNH H.1, H.2, H.3, H.4** |
 
 ---
@@ -32,7 +32,7 @@
 | **P.2** | Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$) | Phi | 17/11 | [⏳] Đang mở rộng | Script `equilibrium_crosscheck.py` & số liệu tạm thời $m \le 64$ |
 | **P.3** | Biên soạn Tài liệu Đe dọa Bảo mật `docs/THREAT_MODELING.md` | Phi | 18/11 | [x] Hoàn thành | Tệp `docs/THREAT_MODELING.md` qua review độc lập |
 | **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [x] Hoàn thành | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` chuẩn [CS83], [RSW94] |
-| **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; đọc số dư EVCC và MockUSDC chính xác |
+| **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [ ] Chưa xong | DApp kết nối ví MetaMask mạng Amoy |
 | **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [x] Hoàn thành | Component `FaucetModal.tsx`, nhận MockUSDC thật trên Amoy |
 | **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [⏳] Sẵn sàng demo | Luồng đặt lệnh và vẽ Depth Chart sẵn sàng cho phiên 18/11 |
 | **T.4** | Hoàn thiện Bộ thiết kế Wireframe Figma 4 phân hệ DApp | Thắng | 20/11 | [x] Hoàn thành | Thư mục `docs/wireframes/` (4 PNG 2880x2000 & 4 SVG vector) |

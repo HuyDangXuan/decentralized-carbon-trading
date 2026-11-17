@@ -11,9 +11,9 @@
 
 ### DANH SÁCH NHIỆM VỤ CẦN THỰC HIỆN
 
-#### ✅ Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
+#### 🔲 Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
 * **Hạn chót:** **15/11/2026**
-* **Trạng thái:** `- [x] Hoàn thành`
+* **Trạng thái:** `- [ ] Chưa hoàn thành`
 * **Mô tả công việc:**
   1. Nhận địa chỉ 3 hợp đồng (`MockUSDC`, `CarbonCredit1155`, `CarbonDoubleAuction`) từ tệp `docs/DEPLOYED_ADDRESSES.md` của Đức.
   2. Tạo/cập nhật file `frontend/.env.local`:
@@ -85,10 +85,6 @@
 - Vấn đề phát sinh (nếu có):
 ```
 
-- **12/11/2026 · T.1** Đã cấu hình ba địa chỉ Polygon Amoy và bổ sung hiển thị số dư EVCC theo token ID cùng MockUSDC theo địa chỉ ví. Số dư MockUSDC dùng 6 chữ số thập phân.
-- **Kiểm tra** 14 bài kiểm thử frontend, 10 bài kiểm thử metadata, TypeScript, lint và production build đều đạt. Chrome dùng đầu nối ví giả lập với RPC Amoy thật hiển thị 0 EVCC cho token 101 và 10.000.000 MockUSDC, khớp kết quả đọc độc lập tại block 52674033 của ví triển khai công khai.
-- **Lỗi kết nối MetaMask** Ưu tiên MetaMask do trình duyệt công bố qua EIP-6963, hỗ trợ cách phát hiện cũ và hướng dẫn mở đúng trình duyệt khi không có tiện ích. Đã kiểm tra trường hợp có ví khác, thiếu MetaMask và hủy yêu cầu kết nối. Hai số dư vẫn khớp với RPC Amoy khi dùng đầu nối giả lập.
-- **Nghiệm thu T.1** Chrome kết nối tiện ích MetaMask thật trên Polygon Amoy (chain ID 80002). Sau khi đổi RPC mặc định của DApp sang Tenderly, bảng điều khiển hiển thị **0 EVCC (token #101)** và **0 MockUSDC**. Kết quả khớp với hai lệnh `balanceOf` đọc độc lập tại block `52676023`; MockUSDC có 6 chữ số thập phân. Không cần ký hoặc gửi giao dịch để đối chiếu.
 - **17/11/2026 · T.2** Modal faucet trên navbar có nút nhận 10.000 MockUSDC và 100 EVCC #101. Faucet EVCC cấp từ số dư của lô đã đúc, một lượt mỗi ví, vì `mintProjectLot` yêu cầu verifier và chỉ tạo lô #101 một lần. Đã kiểm tra lệnh mint MockUSDC bằng mô phỏng Amoy và chạy bytecode hai luồng trên EVM cục bộ.
 - **Nghiệm thu MockUSDC** Ví thử `0xF6dD…B5d5` nhận 10.000 MockUSDC trên Amoy, số dư tăng từ 100.000 lên 110.000 tại block `53080025`. [Biên nhận MockUSDC](https://amoy.polygonscan.com/tx/0x5c5f6de5c2d6248c52772b134a6636a4d7415be0e3341178be03b2ab5e553bf2)
 - **Còn chờ nghiệm thu EVCC #101** Đức đã nạp 1.000 EVCC vào faucet `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED`. Frontend đọc hợp đồng EVCC liên kết và tồn kho #101 trước khi gọi `claim()`. Cần xác nhận giao dịch trên web và đối chiếu mức tăng 100 EVCC. [Biên nhận nạp faucet](https://amoy.polygonscan.com/tx/0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d)
