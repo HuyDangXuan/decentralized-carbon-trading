@@ -14,11 +14,11 @@ Ví tạo riêng cho bot, không dùng ví deployer. Khóa riêng chỉ nằm �
 
 1. Cấp `SETTLEMENT_OPERATOR_ROLE` cho địa chỉ trên bằng `grantRole` trên hợp đồng `CarbonDoubleAuction` (Amoy).
 2. Gửi địa chỉ hợp đồng `CarbonDoubleAuction` đã deploy trên Amoy (và địa chỉ token thanh toán, tín chỉ ERC-1155 nếu khác), để ghi vào `docs/DEPLOYED_ADDRESSES.md`.
-3. Báo lại mã giao dịch `grantRole` để Phi kiểm tra bằng `hasRole`.
+3. Chuyển giúp **0,1 POL (Amoy)** vào địa chỉ ví trên để trả gas. Faucet công khai đòi ví có ETH thật trên Mainnet nên Phi không tự nạp được.
+4. Báo lại mã giao dịch `grantRole` (và giao dịch chuyển POL) để Phi kiểm tra bằng `hasRole` và số dư.
 
 ## Phi sẽ làm sau khi có quyền
 
-- Nạp POL từ faucet Amoy cho ví này để trả gas.
 - Chạy bot với `--dry-run` (chỉ đọc chain), rồi nộp thật một phiên nhỏ.
 - Đối chiếu event `TradeSettled` trên chain với báo cáo của bot và báo kết quả cho nhóm.
 
