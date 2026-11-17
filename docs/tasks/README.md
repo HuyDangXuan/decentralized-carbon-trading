@@ -33,7 +33,7 @@
 | **P.3** | Biên soạn Tài liệu Đe dọa Bảo mật `docs/THREAT_MODELING.md` | Phi | 18/11 | [ ] Chưa xong | Tệp `docs/THREAT_MODELING.md` hoàn chỉnh |
 | **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [ ] Chưa xong | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` |
 | **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; số dư EVCC và MockUSDC khớp blockchain |
-| **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [ ] Chưa xong | Component `FaucetModal.tsx` trên giao diện |
+| **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [x] Hoàn thành | Nhận 10.000 MockUSDC và 100 EVCC #101 từ web, có biên nhận Amoy |
 | **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [ ] Chưa xong | Đặt lệnh hiển thị Depth Chart $< 1$s |
 | **T.4** | Hoàn thiện Bộ thiết kế Wireframe Figma 4 phân hệ DApp | Thắng | 20/11 | [ ] Chưa xong | Thư mục `docs/wireframes/` & Link Figma |
 | **H.1** | Viết script kiểm thử toàn trình `scripts/test_e2e_integration.py` | Huy | 17/11 | [ ] Chưa xong | Script test 5 bước khép kín tự động |
