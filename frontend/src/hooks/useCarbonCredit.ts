@@ -16,7 +16,13 @@ import {
   useWaitForTransactionReceipt,
   useWatchContractEvent,
 } from "wagmi";
+import { parseAbi } from "viem";
+import { polygonAmoy } from "wagmi/chains";
 import { CARBON_CREDIT_1155_ABI, getContractAddresses, requireContractAddress } from "../contracts";
+
+const amoyLotAbi = parseAbi([
+  "function getLotDetails(uint256 tokenId) view returns ((address projectDeveloper, uint64 verificationTimestamp, uint32 vintageYear, uint128 totalIssued, uint128 circulatingSupply, uint128 bufferPoolAmount, uint64 totalRetired, uint16 bufferPoolBps, uint8 standardType, bool isActive, uint32 _reserved))",
+]);
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -37,6 +43,7 @@ export function useCreditBalance(account?: `0x${string}`, tokenId?: bigint, chai
     address: getContractAddress(chainId),
     abi: CARBON_CREDIT_1155_ABI,
     functionName: "balanceOf",
+    chainId,
     args: account && tokenId !== undefined ? [account, tokenId] : undefined,
     query: {
       enabled: !!getContractAddress(chainId) && !!account && tokenId !== undefined,
@@ -50,9 +57,24 @@ export function useCreditURI(tokenId?: bigint, chainId?: number) {
     address: getContractAddress(chainId),
     abi: CARBON_CREDIT_1155_ABI,
     functionName: "uri",
+    chainId,
     args: tokenId !== undefined ? [tokenId] : undefined,
     query: {
       enabled: !!getContractAddress(chainId) && tokenId !== undefined,
+    },
+  });
+}
+
+/** Read the lot tuple exported by the Amoy v2 contract. */
+export function useAmoyCreditLot(tokenId?: bigint, chainId?: number) {
+  return useReadContract({
+    address: getContractAddress(chainId),
+    chainId,
+    abi: amoyLotAbi,
+    functionName: "getLotDetails",
+    args: tokenId !== undefined ? [tokenId] : undefined,
+    query: {
+      enabled: chainId === polygonAmoy.id && !!getContractAddress(chainId) && tokenId !== undefined,
     },
   });
 }

@@ -11,14 +11,14 @@
 
 ### DANH SÁCH NHIỆM VỤ CẦN THỰC HIỆN
 
-#### 🔲 Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
+#### ✅ Task T.1: Cấu hình DApp kết nối Contract thực tế trên Polygon Amoy
 * **Hạn chót:** **15/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Hoàn thành`
 * **Mô tả công việc:**
   1. Nhận địa chỉ 3 hợp đồng (`MockUSDC`, `CarbonCredit1155`, `CarbonDoubleAuction`) từ tệp `docs/DEPLOYED_ADDRESSES.md` của Đức.
   2. Tạo/cập nhật file `frontend/.env.local`:
      ```env
-     NEXT_PUBLIC_AMOY_RPC_URL="https://rpc-amoy.polygon.technology"
+     NEXT_PUBLIC_AMOY_RPC_URL="https://polygon-amoy.gateway.tenderly.co"
      NEXT_PUBLIC_CARBON_AUCTION_ADDRESS="0x..."
      NEXT_PUBLIC_CARBON_CREDIT_ADDRESS="0x..."
      NEXT_PUBLIC_MOCK_USDC_ADDRESS="0x..."
@@ -37,7 +37,7 @@
   1. Tạo component mới: `frontend/src/components/FaucetModal.tsx`.
   2. Cung cấp giao diện trực quan với 2 nút bấm tiện ích:
      * **Nút 1: "Nhận 10,000 MockUSDC"** $\to$ Gọi hàm `mint(msg.sender, 10_000 * 10^6)` trên contract `MockUSDC.sol`.
-     * **Nút 2: "Đúc thử 100 tCO2e"** $\to$ Gọi hàm đúc mẫu trên `CarbonCredit1155.sol` (Token ID: 101 - Rừng Tây Bắc Vintage 2026).
+     * **Nút 2: "Nhận 100 EVCC (#101)"** $\to$ Gọi `EvccFaucet.claim()` để chuyển 100 tCO₂e đã đúc trên `CarbonCredit1155.sol` (Token ID: 101 - Rừng Tây Bắc Vintage 2026). `mintProjectLot` chỉ tạo lô một lần và yêu cầu `VERIFIER_ROLE`.
   3. Thêm nút kích hoạt Modal này trên Header/Navbar của DApp.
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Người dùng thử nghiệm, GVHD hoặc Hội đồng nghiệm thu có thể tự bấm nút nhận token testnet ngay trên web mà không cần dùng lệnh CLI phức tạp.
@@ -84,3 +84,11 @@
 - Tiến độ:
 - Vấn đề phát sinh (nếu có):
 ```
+
+- **12/11/2026 · T.1** Đã cấu hình ba địa chỉ Polygon Amoy và bổ sung hiển thị số dư EVCC theo token ID cùng MockUSDC theo địa chỉ ví. Số dư MockUSDC dùng 6 chữ số thập phân.
+- **Kiểm tra** 14 bài kiểm thử frontend, 10 bài kiểm thử metadata, TypeScript, lint và production build đều đạt. Chrome dùng đầu nối ví giả lập với RPC Amoy thật hiển thị 0 EVCC cho token 101 và 10.000.000 MockUSDC, khớp kết quả đọc độc lập tại block 52674033 của ví triển khai công khai.
+- **Lỗi kết nối MetaMask** Ưu tiên MetaMask do trình duyệt công bố qua EIP-6963, hỗ trợ cách phát hiện cũ và hướng dẫn mở đúng trình duyệt khi không có tiện ích. Đã kiểm tra trường hợp có ví khác, thiếu MetaMask và hủy yêu cầu kết nối. Hai số dư vẫn khớp với RPC Amoy khi dùng đầu nối giả lập.
+- **Nghiệm thu T.1** Chrome kết nối tiện ích MetaMask thật trên Polygon Amoy (chain ID 80002). Sau khi đổi RPC mặc định của DApp sang Tenderly, bảng điều khiển hiển thị **0 EVCC (token #101)** và **0 MockUSDC**. Kết quả khớp với hai lệnh `balanceOf` đọc độc lập tại block `52676023`; MockUSDC có 6 chữ số thập phân. Không cần ký hoặc gửi giao dịch để đối chiếu.
+- **17/11/2026 · T.2** Modal faucet trên navbar có nút nhận 10.000 MockUSDC và 100 EVCC #101. Faucet EVCC cấp từ số dư của lô đã đúc, một lượt mỗi ví, vì `mintProjectLot` yêu cầu verifier và chỉ tạo lô #101 một lần. Đã kiểm tra lệnh mint MockUSDC bằng mô phỏng Amoy và chạy bytecode hai luồng trên EVM cục bộ.
+- **Còn chờ nghiệm thu T.2** Lô #101 đã được tạo trên Amoy ở block `53076063`. Tại block `53076892`, ví giữ lô vẫn có 10.000 EVCC (8.500 lưu hành và 1.500 dự phòng) và ví thử `0xF6dD…B5d5` có 0 POL. Cần triển khai faucet, nạp EVCC lưu hành từ ví giữ lô, cấu hình địa chỉ trên frontend rồi xác nhận cả hai giao dịch bằng một ví thử có POL. [Giao dịch tạo lô #101](https://amoy.polygonscan.com/tx/0xc4eeb089df2de6643690c658c3c41cc4d524189b86d38cd13524b77064fd159b) · [Hướng dẫn triển khai và nghiệm thu](../../frontend/README.md#faucet-thử-nghiệm-t2).
+- **17/11/2026 · T.4** Đã dựng bốn mockup theo SRS và xuất ảnh PNG 2880 × 2000 px cùng nguồn SVG tại [thư mục wireframes](../wireframes/README.md). Còn chờ nhập vào Figma Design và xác minh Huy mở được link xem trước khi tích hoàn thành.
