@@ -37,7 +37,7 @@
   1. Tạo component mới: `frontend/src/components/FaucetModal.tsx`.
   2. Cung cấp giao diện trực quan với 2 nút bấm tiện ích:
      * **Nút 1: "Nhận 10,000 MockUSDC"** $\to$ Gọi hàm `mint(msg.sender, 10_000 * 10^6)` trên contract `MockUSDC.sol`.
-     * **Nút 2: "Đúc thử 100 tCO2e"** $\to$ Gọi hàm đúc mẫu trên `CarbonCredit1155.sol` (Token ID: 101 - Rừng Tây Bắc Vintage 2026).
+     * **Nút 2: "Nhận 100 EVCC (#101)"** $\to$ Gọi `EvccFaucet.claim()` để chuyển 100 tCO₂e đã đúc trên `CarbonCredit1155.sol` (Token ID: 101 - Rừng Tây Bắc Vintage 2026). `mintProjectLot` chỉ tạo lô một lần và yêu cầu `VERIFIER_ROLE`.
   3. Thêm nút kích hoạt Modal này trên Header/Navbar của DApp.
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Người dùng thử nghiệm, GVHD hoặc Hội đồng nghiệm thu có thể tự bấm nút nhận token testnet ngay trên web mà không cần dùng lệnh CLI phức tạp.
@@ -90,5 +90,5 @@
 - **Lỗi kết nối MetaMask** Ưu tiên MetaMask do trình duyệt công bố qua EIP-6963, hỗ trợ cách phát hiện cũ và hướng dẫn mở đúng trình duyệt khi không có tiện ích. Đã kiểm tra trường hợp có ví khác, thiếu MetaMask và hủy yêu cầu kết nối. Hai số dư vẫn khớp với RPC Amoy khi dùng đầu nối giả lập.
 - **Nghiệm thu T.1** Chrome kết nối tiện ích MetaMask thật trên Polygon Amoy (chain ID 80002). Sau khi đổi RPC mặc định của DApp sang Tenderly, bảng điều khiển hiển thị **0 EVCC (token #101)** và **0 MockUSDC**. Kết quả khớp với hai lệnh `balanceOf` đọc độc lập tại block `52676023`; MockUSDC có 6 chữ số thập phân. Không cần ký hoặc gửi giao dịch để đối chiếu.
 - **17/11/2026 · T.2** Modal faucet trên navbar có nút nhận 10.000 MockUSDC và 100 EVCC #101. Faucet EVCC cấp từ số dư của lô đã đúc, một lượt mỗi ví, vì `mintProjectLot` yêu cầu verifier và chỉ tạo lô #101 một lần. Đã kiểm tra lệnh mint MockUSDC bằng mô phỏng Amoy và chạy bytecode hai luồng trên EVM cục bộ.
-- **Còn chờ nghiệm thu T.2** Tại block `53071733`, lô #101 chưa có trên hợp đồng Amoy của nhóm. Cần verifier tạo lô, cấp tồn kho vào faucet đã triển khai, cấu hình địa chỉ frontend rồi tự nhận cả hai token bằng ví thử và đối chiếu số dư. Xem [hướng dẫn faucet](../../frontend/README.md#faucet-thử-nghiệm-t2).
+- **Còn chờ nghiệm thu T.2** Lô #101 đã được tạo trên Amoy ở block `53076063`. Tại block `53076892`, ví giữ lô vẫn có 10.000 EVCC (8.500 lưu hành và 1.500 dự phòng) và ví thử `0xF6dD…B5d5` có 0 POL. Cần triển khai faucet, nạp EVCC lưu hành từ ví giữ lô, cấu hình địa chỉ trên frontend rồi xác nhận cả hai giao dịch bằng một ví thử có POL. [Giao dịch tạo lô #101](https://amoy.polygonscan.com/tx/0xc4eeb089df2de6643690c658c3c41cc4d524189b86d38cd13524b77064fd159b) · [Hướng dẫn triển khai và nghiệm thu](../../frontend/README.md#faucet-thử-nghiệm-t2).
 - **17/11/2026 · T.4** Đã dựng bốn mockup theo SRS và xuất ảnh PNG 2880 × 2000 px cùng nguồn SVG tại [thư mục wireframes](../wireframes/README.md). Còn chờ nhập vào Figma Design và xác minh Huy mở được link xem trước khi tích hoàn thành.
