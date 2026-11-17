@@ -29,7 +29,7 @@ import hmac
 import os
 import re
 import time
-from typing import Callable, Dict, Literal, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Literal, Optional, Set, Tuple
 
 from eth_account import Account
 from eth_account.messages import encode_typed_data
@@ -37,7 +37,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocke
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from auction_agent import ACTIVE_STATUSES, DoubleAuctionAgent, OrderStatus
 from order_book import Order, OrderType
@@ -51,6 +51,7 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 DOMAIN_NAME = "EPU Carbon Double Auction"
 DOMAIN_VERSION = "2.0"
 CHAIN_ID = 80002  # Polygon Amoy
+DEFAULT_AUCTION_CONTRACT = "0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f"
 ORDER_TYPES = {
     "Order": [
         {"name": "orderId", "type": "bytes32"},
@@ -87,6 +88,43 @@ class PlaceOrderRequest(BaseModel):
     order: OrderPayload
     signature: str
     time_in_force: Literal["GTC", "IOC"] = "GTC"
+    chain_id: Optional[int] = None
+    verifying_contract: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Hỗ trợ format phẳng được gửi từ frontend matchingApi.ts
+            if "order" not in data and ("order_id" in data or "orderId" in data):
+                raw_tif = data.get("time_in_force", "GTC")
+                if raw_tif == 0 or raw_tif == "0":
+                    tif = "GTC"
+                elif raw_tif == 1 or raw_tif == "1":
+                    tif = "IOC"
+                elif str(raw_tif).upper() in ("GTC", "IOC"):
+                    tif = str(raw_tif).upper()
+                else:
+                    tif = "GTC"
+
+                order_dict = {
+                    "orderId": data.get("order_id") or data.get("orderId"),
+                    "trader": data.get("trader"),
+                    "orderType": int(data.get("order_type") if data.get("order_type") is not None else data.get("orderType", 0)),
+                    "tokenId": int(data.get("token_id") if data.get("token_id") is not None else data.get("tokenId", 0)),
+                    "amount": int(data.get("amount", 0)),
+                    "pricePerUnit": int(data.get("price_per_unit") if data.get("price_per_unit") is not None else data.get("pricePerUnit", 0)),
+                    "nonce": int(data.get("nonce", 0)),
+                    "deadline": int(data.get("deadline", 0)),
+                }
+                return {
+                    "order": order_dict,
+                    "signature": data.get("signature", ""),
+                    "time_in_force": tif,
+                    "chain_id": data.get("chain_id") or data.get("chainId"),
+                    "verifying_contract": data.get("verifying_contract") or data.get("verifyingContract"),
+                }
+        return data
 
 
 class CancelOrderRequest(BaseModel):
@@ -151,7 +189,7 @@ def create_app(
         "version": DOMAIN_VERSION,
         "chainId": CHAIN_ID,
         "verifyingContract": contract_address
-        or os.environ.get("AUCTION_CONTRACT_ADDRESS", "0x" + "0" * 40),
+        or os.environ.get("AUCTION_CONTRACT_ADDRESS", DEFAULT_AUCTION_CONTRACT),
     }
     used_cancel_nonces: Set[Tuple[str, int]] = set()
     confirmed_hashes: Set[str] = set()
@@ -231,7 +269,12 @@ def create_app(
                 # eth_account chấp nhận chữ ký biến dạng (s > n/2) nhưng hợp đồng thì không: bot sẽ tốn gas vô ích
                 raise HTTPException(401, "signature s-value is in the upper half of the curve (rejected on-chain)")
             try:
-                signer = _recover(domain, ORDER_TYPES, message, req.signature)
+                order_domain = dict(domain)
+                if req.chain_id:
+                    order_domain["chainId"] = req.chain_id
+                if req.verifying_contract:
+                    order_domain["verifyingContract"] = req.verifying_contract
+                signer = _recover(order_domain, ORDER_TYPES, message, req.signature)
             except ValueError:
                 raise HTTPException(401, "invalid signature")
             if signer != trader:

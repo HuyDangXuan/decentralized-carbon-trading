@@ -10,11 +10,10 @@ export const ORDER_TYPES = {
     { name: "orderId", type: "bytes32" }, { name: "trader", type: "address" },
     { name: "orderType", type: "uint8" }, { name: "tokenId", type: "uint256" },
     { name: "amount", type: "uint128" }, { name: "pricePerUnit", type: "uint128" },
-    { name: "timeInForce", type: "uint8" }, { name: "nonce", type: "uint256" },
-    { name: "deadline", type: "uint256" },
+    { name: "nonce", type: "uint256" }, { name: "deadline", type: "uint256" },
   ],
 } as const;
-export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint8 timeInForce,uint256 nonce,uint256 deadline)";
+export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint256 nonce,uint256 deadline)";
 export interface OrderParams {
   orderType: OrderType;
   tokenId: bigint;
@@ -23,9 +22,13 @@ export interface OrderParams {
   timeInForce: TimeInForce;
   deadline?: bigint;
 }
-export interface OrderMessage extends Omit<OrderParams, "deadline"> {
+export interface OrderMessage {
   orderId: Hex;
   trader: Address;
+  orderType: OrderType;
+  tokenId: bigint;
+  amount: bigint;
+  pricePerUnit: bigint;
   nonce: bigint;
   deadline: bigint;
 }
@@ -75,11 +78,19 @@ export function buildOrderMessage(trader: Address, params: OrderParams, nonce: b
   if (nonce < 0n || nonce > MAX_UINT256) throw new Error("Nonce không hợp lệ.");
   const deadline = params.deadline ?? now + 3600n;
   if (deadline <= now || deadline > MAX_UINT256) throw new Error("Thời hạn lệnh phải nằm trong tương lai.");
-  // Exact FR-04 formula. timeInForce is bound by the typed signature.
-  // Identical seven-field orders share an ID and must be deduplicated by the API.
+  // Exact FR-04 formula. Identical seven-field orders share an ID and must be deduplicated by the API.
   const orderId = keccak256(encodeAbiParameters(
     [{ type: "address" }, { type: "uint8" }, { type: "uint256" }, { type: "uint128" }, { type: "uint128" }, { type: "uint256" }, { type: "uint256" }],
     [trader, params.orderType, params.tokenId, params.amount, params.pricePerUnit, nonce, deadline],
   ));
-  return { ...params, orderId, trader, nonce, deadline };
+  return {
+    orderId,
+    trader,
+    orderType: params.orderType,
+    tokenId: params.tokenId,
+    amount: params.amount,
+    pricePerUnit: params.pricePerUnit,
+    nonce,
+    deadline,
+  };
 }

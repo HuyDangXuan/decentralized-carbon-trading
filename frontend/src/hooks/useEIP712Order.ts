@@ -47,7 +47,7 @@ export function useEIP712Order(): UseEIP712OrderReturn {
       if (!stillSameWallet()) throw new Error("Ví hoặc mạng đã đổi trong lúc ký; lệnh chưa được gửi.");
       if (message.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Error("Lệnh đã hết hạn trong lúc chờ ký; hãy tạo lệnh mới.");
       const signed: SignedOrder = {
-        orderId: message.orderId, trader: address, orderType: message.orderType, timeInForce: message.timeInForce,
+        orderId: message.orderId, trader: address, orderType: message.orderType, timeInForce: params.timeInForce,
         tokenId: message.tokenId.toString(), amount: message.amount.toString(), pricePerUnit: message.pricePerUnit.toString(),
         nonce: message.nonce.toString(), deadline: message.deadline.toString(), signature, chainId, verifyingContract,
       };

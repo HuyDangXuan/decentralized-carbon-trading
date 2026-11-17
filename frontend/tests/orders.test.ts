@@ -35,13 +35,13 @@ test("invalid network, empty contract and expired orders are blocked", () => {
   assert.throws(() => getEIP712Domain(80002, zeroAddress));
   assert.throws(() => buildOrderMessage(account.address, { ...params, deadline: 1000n }, 0n, 1000n));
 });
-test("signature binds GTC/IOC, nonce, chain and verifying contract", async () => {
+test("signature binds amount, nonce, chain and verifying contract", async () => {
   const domain = getEIP712Domain(80002, auction);
   const message = buildOrderMessage(account.address, params, 7n, 1000n);
   const data = { domain, types: ORDER_TYPES, primaryType: "Order" as const, message };
   const signature = await account.signTypedData(data);
   assert.equal(await verifyTypedData({ ...data, address: account.address, signature }), true);
-  for (const changed of [{ ...message, timeInForce: TimeInForce.IOC }, { ...message, nonce: 8n }]) {
+  for (const changed of [{ ...message, amount: 99n }, { ...message, nonce: 8n }]) {
     assert.equal(await verifyTypedData({ ...data, message: changed, address: account.address, signature }), false);
   }
   for (const changed of [{ ...domain, chainId: 11155111 }, { ...domain, verifyingContract: `0x${"33".repeat(20)}` as const }]) {

@@ -71,6 +71,21 @@ class TestApiService(unittest.TestCase):
         got = self.client.get(f"/api/v1/orders/{oid(1)}").json()
         self.assertEqual((got["amount"], got["remaining_amount"], got["status"]), (5, 5, "NEW"))
 
+    def test_valid_flat_order_accepted(self):
+        message = {
+            "orderId": oid(100), "trader": self.alice.address, "orderType": 0, "tokenId": 101,
+            "amount": 5, "pricePerUnit": 10_000_000, "nonce": 0, "deadline": FUTURE,
+        }
+        sig = self.sign(KEY_ALICE, api_service.ORDER_TYPES, message)
+        flat_body = {
+            "order_id": oid(100), "trader": self.alice.address, "order_type": 0, "token_id": "101",
+            "amount": "5", "price_per_unit": "10000000", "time_in_force": 0, "nonce": "0",
+            "deadline": str(FUTURE), "signature": sig, "chain_id": 80002, "verifying_contract": CONTRACT,
+        }
+        r = self.post(flat_body)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json(), {"orderId": oid(100), "status": "NEW"})
+
     def test_signature_from_other_wallet_rejected(self):
         body = self.order_body(KEY_BOB, self.bob, 2, 0, 10, 5)
         body["order"]["trader"] = self.alice.address  # Bob ký nhưng khai là Alice
