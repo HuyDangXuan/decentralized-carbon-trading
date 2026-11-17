@@ -19,6 +19,7 @@
 | **`MockUSDC`** | ERC-20 (6 decimals) | `0xe35681b0882d533458d22B344268642136ebD813` | [Xem trên PolygonScan](https://amoy.polygonscan.com/address/0xe35681b0882d533458d22B344268642136ebD813) |
 | **`CarbonCredit1155`** | ERC-1155 (Packed 3-slots, 15% Buffer) | `0x851978601b47a61B8aF3bcC1707B689Fbc977697` | [Xem trên PolygonScan](https://amoy.polygonscan.com/address/0x851978601b47a61B8aF3bcC1707B689Fbc977697) |
 | **`CarbonDoubleAuction`**| EIP-712 Atomic Swap T+0 | `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f` | [Xem trên PolygonScan](https://amoy.polygonscan.com/address/0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f) |
+| **`EvccFaucet`** | Faucet Tín chỉ EVCC #101 (100 tCO2e/lần) | `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED` | [Xem trên PolygonScan](https://amoy.polygonscan.com/address/0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED) |
 
 ---
 
@@ -45,7 +46,13 @@
    NEXT_PUBLIC_MOCK_USDC_ADDRESS=0xe35681b0882d533458d22B344268642136ebD813
    NEXT_PUBLIC_CARBON_CREDIT_ADDRESS=0x851978601b47a61B8aF3bcC1707B689Fbc977697
    NEXT_PUBLIC_AUCTION_ADDRESS=0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f
+   NEXT_PUBLIC_EVCC_FAUCET_ADDRESS=0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED
    ```
+4. **Hợp đồng Faucet EVCC #101 (Phục vụ Task T.2):**
+   * **Địa chỉ EvccFaucet:** `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED`
+   * **ABI:** [`contracts/abis/EvccFaucet.json`](contracts/abis/EvccFaucet.json)
+   * **TxHash nạp 1,000 EVCC #101 vào Faucet:** [`0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d`](https://amoy.polygonscan.com/tx/0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d)
+   * **Hàm gọi nhận token:** `claim()` hoặc `evccFaucet()` hoặc `faucet()` (tự động chuyển 100 tCO2e cho `msg.sender`).
 3. **EIP-712 Domain Separator Frontend:**
    ```javascript
    const domain = {
@@ -58,7 +65,10 @@
 
 ### 3.2 Dành cho bạn Nguyễn Bảo Phi (Auction Matching & Submitter Bot)
 1. **Cấu hình bot thanh toán on-chain:** Bot nộp kết quả khớp lệnh gọi hàm `batchSettleTrades` vào hợp đồng `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`.
-2. **Quyền hạn:** Để ví bot của Phi có thể gọi hàm settlement, Đức đã cấp sẵn quyền `SETTLEMENT_OPERATOR_ROLE` cho deployer và có thể cấp thêm cho địa chỉ ví bot của Phi khi Phi gửi địa chỉ ví.
+2. **Quyền hạn:** Đã cấp quyền `SETTLEMENT_OPERATOR_ROLE` chính thức cho địa chỉ ví bot của Phi:
+   - **Địa chỉ ví Bot:** `0xa4b198e0f6EB111F6B1dcc1c898C024222240EDE`
+   - **Trạng thái:** ✅ Đã cấp quyền on-chain (Verified). Ví bot có thể trực tiếp gọi `batchSettleTrades` và `settleMatchedTrade`.
+   - **Tài trợ phí gas:** Đã chuyển POL vào ví bot để đảm bảo thực thi tự động.
 
 ---
 
