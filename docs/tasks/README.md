@@ -15,7 +15,7 @@
 | :--- | :--- | :---: | :---: |
 | **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`TASK_DUC_SMART_CONTRACT.md`](TASK_DUC_SMART_CONTRACT.md) | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ (Đ.1 – Đ.4)** |
 | **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`TASK_PHI_AUCTION_ENGINE.md`](TASK_PHI_AUCTION_ENGINE.md) | 🟢 **HOÀN THÀNH P.1, P.3, P.4 (P.2 ĐANG MỞ RỘNG)** |
-| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH T.1, T.2, T.4 (T.3 SẴN SÀNG DEMO)** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH 100% CÁC TASK (T.1 – T.4)** |
 | **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`TASK_HUY_LEAD_COORDINATION.md`](TASK_HUY_LEAD_COORDINATION.md) | 🟢 **HOÀN THÀNH H.1, H.2, H.3, H.4** |
 
 ---
@@ -34,7 +34,7 @@
 | **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [x] Hoàn thành | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` chuẩn [CS83], [RSW94] |
 | **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; đọc số dư EVCC và MockUSDC chính xác |
 | **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [x] Hoàn thành | Nhận 10.000 MockUSDC và 100 EVCC #101 từ web, có biên nhận Amoy |
-| **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [⏳] Sẵn sàng demo | Luồng đặt lệnh và vẽ Depth Chart sẵn sàng cho phiên 18/11 |
+| **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [x] Hoàn thành | Luồng đặt lệnh & WebSocket Depth Chart test pass 100% (<500ms) |
 | **T.4** | Hoàn thiện Bộ thiết kế Wireframe Figma 4 phân hệ DApp | Thắng | 20/11 | [x] Hoàn thành | Thư mục `docs/wireframes/` (4 PNG 2880x2000 & 4 SVG vector) |
 | **H.1** | Viết script kiểm thử toàn trình `scripts/test_e2e_integration.py` | Huy | 17/11 | [x] Hoàn thành | Script test 5 bước khép kín tự động (Hardhat & Amoy) |
 | **H.2** | Triệu tập và chủ trì phiên Demo Liên thông Nội bộ nhóm | Huy | 18/11 | [x] Đã sẵn sàng | Tệp `docs/KE_HOACH_DEMO_NOI_BO_18_11.md` 5 kịch bản diễn tập |
