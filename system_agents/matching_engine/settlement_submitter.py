@@ -321,6 +321,10 @@ class Web3Chain:
         from web3 import Web3
 
         w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 30}))
+        # Amoy là chuỗi PoA: extraData dài hơn 32 byte nên web3 từ chối đọc block nếu thiếu middleware này.
+        from web3.middleware import ExtraDataToPOAMiddleware
+
+        w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         if not w3.is_connected():
             raise SettlementError(f"cannot connect to RPC {rpc_url}")
         if w3.eth.chain_id != chain_id:
