@@ -11,6 +11,10 @@ Nhánh: `feat/phi-settlement-submitter-bot`. Chưa push tại thời điểm vi�
 | P.4 Chuẩn hóa theo paper | `docs/MATCHING_ENGINE_SPEC.md` | H4 xong; H7 làm rõ tên; H7 A/B và H8 chờ Huy. |
 | P.2 Thực nghiệm C mở rộng | `export_strategies_c.py`, `run_experiment_c_multiunit.py`, `results/exp_c_*`, spec §9.5 | Xem giới hạn bên dưới. |
 
+## P.2 vẫn đang chạy thử (sẽ cập nhật ở phiên sau)
+
+Phi vẫn đang chạy thử Thực nghiệm C ở các mức tham số khác (m, k, số kịch bản, số vòng lặp) để có output chuẩn nhất. Các số liệu P.2 dưới đây là kết quả tạm thời, **chưa phải bản chốt**; bản chốt (kèm CSV thô và độ dốc đã tái tính) sẽ được cập nhật ở phiên sau.
+
 ## Giới hạn của P.2 (cần ghi khi trích dẫn)
 
 - k = 1: m đến 64. Độ dốc log-log: `pair` −0,95 ± 0,02, `marginal` −1,79 ± 0,05, `kda` −2,25 ± 0,06 (chỉ m = 4…32; `kda` phẳng ở m ≥ 32 và m = 64 không hội tụ).
