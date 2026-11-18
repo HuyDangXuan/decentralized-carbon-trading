@@ -1,18 +1,23 @@
 import { isAddress, zeroAddress, type Address } from "viem";
 export { CARBON_CREDIT_1155_ABI } from "./CarbonCredit1155ABI";
-export { CARBON_DOUBLE_AUCTION_ABI, AUCTION_ABI_READY, AUCTION_NONCE_FUNCTION } from "./CarbonDoubleAuctionABI";
+export { CARBON_DOUBLE_AUCTION_ABI, AUCTION_NONCE_FUNCTION } from "./CarbonDoubleAuctionABI";
 
 function configuredAddress(value?: string): Address | undefined {
   return value && isAddress(value) && value.toLowerCase() !== zeroAddress ? value as Address : undefined;
 }
 export const CONTRACT_ADDRESSES = {
   polygonAmoy: {
-    carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_AMOY_CARBON_CREDIT_ADDRESS),
-    carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_AMOY_AUCTION_ADDRESS),
+    carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_CARBON_CREDIT_ADDRESS ?? process.env.NEXT_PUBLIC_AMOY_CARBON_CREDIT_ADDRESS),
+    carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_CARBON_AUCTION_ADDRESS ?? process.env.NEXT_PUBLIC_AMOY_AUCTION_ADDRESS),
+    mockUsdc: configuredAddress(process.env.NEXT_PUBLIC_MOCK_USDC_ADDRESS),
+    evccFaucet: configuredAddress(process.env.NEXT_PUBLIC_AMOY_EVCC_FAUCET_ADDRESS)
+      ?? configuredAddress(process.env.NEXT_PUBLIC_EVCC_FAUCET_ADDRESS),
   },
   sepolia: {
     carbonCredit1155: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_CARBON_CREDIT_ADDRESS),
     carbonDoubleAuction: configuredAddress(process.env.NEXT_PUBLIC_SEPOLIA_AUCTION_ADDRESS),
+    mockUsdc: undefined,
+    evccFaucet: undefined,
   },
 } as const;
 export function getContractAddresses(chainId?: number) {

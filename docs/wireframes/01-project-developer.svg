@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1000" viewBox="0 0 1440 1000">
+<title>Hồ sơ dự án tín chỉ · CarbonChain</title>
+<rect x="0" y="0" width="1440" height="1000" rx="0" fill="#F4F7F5"/>
+<rect x="0" y="0" width="228" height="1000" rx="0" fill="#102D27"/>
+<rect x="24" y="28" width="40" height="40" rx="12" fill="#D1F4D8"/>
+<g transform="translate(34,38)">
+<path d="M4 17C4 9 10 4 18 3C18 12 13 18 5 18M5 18L14 9" fill="none" stroke="#195841" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="76" y="45" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="start" letter-spacing="0">CarbonChain</text>
+<text x="76" y="62" fill="#A4C5B6" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="500" text-anchor="start" letter-spacing="0">EPU  /  Giai đoạn 2</text>
+<text x="24" y="120" fill="#A4C5B6" font-family="Segoe UI, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="start" letter-spacing="1">KHÔNG GIAN LÀM VIỆC</text>
+<rect x="14" y="141" width="200" height="42" rx="9" fill="#275143"/>
+<rect x="14" y="151" width="3" height="22" rx="1.5" fill="#AAE9BB"/>
+<g transform="translate(26,151)">
+<path d="M3 6H9L11 8H19V17H3Z" fill="none" stroke="#E6F7EE" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="58" y="167" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="650" text-anchor="start" letter-spacing="0">Chủ dự án</text>
+<g transform="translate(26,200)">
+<path d="M11 2L18 5V10C18 14 15 17 11 19C7 17 4 14 4 10V5Z M8 10L10 12L14 8" fill="none" stroke="#A9C7BB" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="58" y="216" fill="#C2D9D0" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="500" text-anchor="start" letter-spacing="0">Thẩm tra VVB</text>
+<g transform="translate(26,249)">
+<path d="M4 4V17H19M7 13L11 10L14 12L19 6" fill="none" stroke="#A9C7BB" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="58" y="265" fill="#C2D9D0" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="500" text-anchor="start" letter-spacing="0">Sàn giao dịch</text>
+<g transform="translate(26,298)">
+<path d="M11 2C14 7 18 10 18 14C18 18 15 20 11 20C7 20 4 17 4 14C4 11 6 9 8 7C8 10 10 11 10 11C12 8 12 5 11 2Z" fill="none" stroke="#A9C7BB" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="58" y="314" fill="#C2D9D0" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="500" text-anchor="start" letter-spacing="0">Tiêu hủy ESG</text>
+<line x1="24" y1="914" x2="204" y2="914" stroke="#375B4D" stroke-width="1"/>
+<text x="24" y="940" fill="#E1F0E8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="650" text-anchor="start" letter-spacing="0">Đại học Điện Lực</text>
+<text x="24" y="959" fill="#A4C5B6" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" letter-spacing="0">Đề tài nghiên cứu sinh viên</text>
+<rect x="228" y="0" width="1212" height="74" rx="0" fill="#FFFFFF"/>
+<line x1="228" y1="73" x2="1440" y2="73" stroke="#D8E4DD" stroke-width="1"/>
+<text x="262" y="43" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="start" letter-spacing="0">Không gian làm việc  /  Chủ dự án</text>
+<rect x="1087" y="23" width="137" height="26" rx="13" fill="#DBF2E6"/>
+<circle cx="1100" cy="36" r="3.5" fill="#0B694F"/>
+<text x="1160.5" y="40.5" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Polygon Amoy</text>
+<rect x="1235" y="23" width="172" height="26" rx="13" fill="#ECF3EF"/>
+<text x="1321.0" y="40.5" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Ví  0x12A8…B570</text>
+<text x="262" y="128" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="720" text-anchor="start" letter-spacing="0">Hồ sơ dự án tín chỉ</text>
+<text x="263" y="156" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="start" letter-spacing="0">Nộp hồ sơ PDD, lưu bằng chứng MRV trên IPFS và theo dõi tín chỉ sau thẩm tra.</text>
+<text x="262" y="975" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">CarbonChain · Dữ liệu minh họa</text>
+<text x="1406" y="975" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="end" letter-spacing="0">Chủ dự án / Giai đoạn 2</text>
+<rect x="1256" y="112" width="150" height="26" rx="13" fill="#FFF0CE"/>
+<circle cx="1269" cy="125" r="3.5" fill="#824900"/>
+<text x="1336.0" y="129.5" fill="#824900" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Bản nháp PDD-101</text>
+<rect x="262" y="187" width="698" height="451" rx="16" fill="#FFFFFF" stroke="#D8E4DD" stroke-width="1"/>
+<text x="284" y="220" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start" letter-spacing="0">Thông tin hồ sơ</text>
+<text x="284" y="242" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Rừng Tây Bắc · Hồ sơ phát hành lô #101</text>
+<text x="284" y="270" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Tên dự án</text>
+<rect x="284" y="280" width="654" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="296" y="306" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">Trồng rừng phòng hộ Tây Bắc</text>
+<text x="284" y="345" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Tiêu chuẩn</text>
+<rect x="284" y="355" width="315" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="296" y="381" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">Verra VCS</text>
+<text x="587" y="380" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="end" letter-spacing="0">⌄</text>
+<text x="620" y="345" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Năm vintage</text>
+<rect x="620" y="355" width="318" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="632" y="381" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">2026</text>
+<text x="284" y="420" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Khu vực</text>
+<rect x="284" y="430" width="315" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="296" y="456" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">Sơn La, Việt Nam</text>
+<text x="620" y="420" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Phương pháp</text>
+<rect x="620" y="430" width="318" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="632" y="456" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">VM0015</text>
+<text x="284" y="495" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Khối lượng đề nghị</text>
+<rect x="284" y="505" width="315" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="296" y="531" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">1.000</text>
+<text x="587" y="530" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="end" letter-spacing="0">tCO₂e</text>
+<text x="620" y="495" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Tỷ lệ quỹ dự phòng</text>
+<rect x="620" y="505" width="318" height="41" rx="8" fill="#FFFFFF" stroke="#C9D9D0" stroke-width="1"/>
+<text x="632" y="531" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="580" text-anchor="start" letter-spacing="0">15</text>
+<text x="926" y="530" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="end" letter-spacing="0">%</text>
+<text x="284" y="581" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Tín chỉ lưu hành dự kiến</text>
+<text x="284" y="605" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="720" text-anchor="start" letter-spacing="0">850 EVCC</text>
+<text x="620" y="581" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="650" text-anchor="start" letter-spacing="0">Quỹ dự phòng dự kiến</text>
+<text x="620" y="605" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="720" text-anchor="start" letter-spacing="0">150 EVCC</text>
+<rect x="262" y="657" width="698" height="283" rx="16" fill="#FFFFFF" stroke="#D8E4DD" stroke-width="1"/>
+<text x="284" y="690" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start" letter-spacing="0">Tài liệu PDD và MRV</text>
+<text x="284" y="712" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Đính kèm hồ sơ và lưu dữ liệu thẩm tra qua IPFS.</text>
+<rect x="284" y="726" width="654" height="61" rx="9" fill="#F4F7F5" stroke="#D8E4DD" stroke-width="1"/>
+<rect x="296" y="739" width="35" height="35" rx="7" fill="#ECF3EF"/>
+<g transform="translate(302,745)">
+<path d="M6 3H13L17 7V19H6Z M13 3V8H17 M9 12H14 M9 15H14" fill="none" stroke="#0B694F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="342" y="751" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="640" text-anchor="start" letter-spacing="0">PDD_TayBac_2026.pdf</text>
+<text x="342" y="770" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" letter-spacing="0">2,4 MB · Hồ sơ mô tả dự án</text>
+<rect x="838" y="744" width="87" height="26" rx="13" fill="#DBF2E6"/>
+<text x="881.5" y="761.5" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Đã đính kèm</text>
+<rect x="284" y="797" width="654" height="61" rx="9" fill="#F4F7F5" stroke="#D8E4DD" stroke-width="1"/>
+<rect x="296" y="810" width="35" height="35" rx="7" fill="#ECF3EF"/>
+<g transform="translate(302,816)">
+<path d="M6 3H13L17 7V19H6Z M13 3V8H17 M9 12H14 M9 15H14" fill="none" stroke="#0B694F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="342" y="822" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="640" text-anchor="start" letter-spacing="0">MRV_TayBac_2026.pdf</text>
+<text x="342" y="841" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" letter-spacing="0">3,8 MB · CID bafy…mrv26</text>
+<rect x="838" y="815" width="87" height="26" rx="13" fill="#DBF2E6"/>
+<text x="881.5" y="832.5" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Đã lưu IPFS</text>
+<rect x="284" y="879" width="140" height="40" rx="8" fill="#FFFFFF" stroke="#BDD3C7" stroke-width="1"/>
+<text x="354.0" y="904" fill="#0B694F" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle" letter-spacing="0">Tải lên IPFS</text>
+<rect x="778" y="879" width="160" height="40" rx="8" fill="#0B694F" stroke="#0B694F" stroke-width="1"/>
+<text x="858.0" y="904" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle" letter-spacing="0">Nộp hồ sơ thẩm tra</text>
+<rect x="978" y="187" width="428" height="451" rx="16" fill="#FFFFFF" stroke="#D8E4DD" stroke-width="1"/>
+<text x="1000" y="220" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start" letter-spacing="0">Tiến độ phát hành</text>
+<text x="1000" y="242" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Các bước của hồ sơ PDD-101</text>
+<line x1="1012" y1="293" x2="1012" y2="548" stroke="#C8D9CF" stroke-width="2"/>
+<circle cx="1012" cy="295" r="10" fill="#0B694F" stroke="#0B694F" stroke-width="2"/>
+<path d="M1008 295l3 3 5-6" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1038" y="292" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="680" text-anchor="start" letter-spacing="0">Soạn hồ sơ</text>
+<text x="1038" y="313" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Đã điền các trường bắt buộc</text>
+<circle cx="1012" cy="372" r="10" fill="#0B694F" stroke="#0B694F" stroke-width="2"/>
+<path d="M1008 372l3 3 5-6" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1038" y="369" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="680" text-anchor="start" letter-spacing="0">Lưu báo cáo MRV lên IPFS</text>
+<text x="1038" y="390" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">CID đã sẵn sàng để đối chiếu</text>
+<circle cx="1012" cy="449" r="10" fill="#FFFFFF" stroke="#B7CCC1" stroke-width="2"/>
+<text x="1038" y="446" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="680" text-anchor="start" letter-spacing="0">Gửi thẩm tra</text>
+<text x="1038" y="467" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Chờ chủ dự án nộp hồ sơ</text>
+<circle cx="1012" cy="526" r="10" fill="#FFFFFF" stroke="#B7CCC1" stroke-width="2"/>
+<text x="1038" y="523" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="680" text-anchor="start" letter-spacing="0">Phê duyệt và đúc EVCC</text>
+<text x="1038" y="544" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Chờ kiểm toán viên ký duyệt</text>
+<rect x="1000" y="588" width="133" height="26" rx="13" fill="#FFF0CE"/>
+<circle cx="1013" cy="601" r="3.5" fill="#824900"/>
+<text x="1071.5" y="605.5" fill="#824900" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="680" text-anchor="middle" letter-spacing="0">Chờ nộp hồ sơ</text>
+<rect x="978" y="657" width="428" height="283" rx="16" fill="#FFFFFF" stroke="#D8E4DD" stroke-width="1"/>
+<text x="1000" y="690" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="start" letter-spacing="0">Tín chỉ của dự án</text>
+<text x="1000" y="712" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Cập nhật sau khi giao dịch đúc được xác nhận.</text>
+<text x="1000" y="768" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="720" text-anchor="start" letter-spacing="0">0</text>
+<text x="1041" y="766" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="600" text-anchor="start" letter-spacing="0">EVCC khả dụng</text>
+<line x1="1000" y1="797" x2="1384" y2="797" stroke="#D8E4DD" stroke-width="1"/>
+<text x="1000" y="831" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Lô dự kiến</text>
+<text x="1384" y="831" fill="#122D27" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="end" letter-spacing="0">#101</text>
+<text x="1000" y="865" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" letter-spacing="0">Giao dịch đúc</text>
+<text x="1384" y="865" fill="#50665E" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="end" letter-spacing="0">Chưa phát sinh</text>
+</svg>

@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-const [path, nonceFunction = "nonces"] = process.argv.slice(2);
+const [path, nonceFunction = "userNonces"] = process.argv.slice(2);
 if (!path) throw new Error("Usage: node scripts/import-auction-artifact.mjs <artifact.json> [nonceGetter]");
 const artifact = JSON.parse(await readFile(path, "utf8"));
 if (artifact.contractName && artifact.contractName !== "CarbonDoubleAuction") throw new Error("Unexpected contract artifact");
@@ -11,5 +11,5 @@ if (!getter || getter.stateMutability !== "view" || getter.inputs?.length !== 1 
 const typeHash = abi.find(item => item.type === "function" && item.name === "ORDER_TYPEHASH");
 if (!typeHash || typeHash.stateMutability !== "view" || typeHash.inputs?.length !== 0 || typeHash.outputs?.length !== 1 || typeHash.outputs[0].type !== "bytes32") throw new Error("Artifact needs ORDER_TYPEHASH() view returns (bytes32)");
 const target = fileURLToPath(new URL("../src/contracts/CarbonDoubleAuctionABI.ts", import.meta.url));
-await writeFile(target, `// Imported from a compiled artifact; ORDER_TYPEHASH is also checked on-chain.\nimport type { Abi } from "viem";\nexport const CARBON_DOUBLE_AUCTION_ABI: Abi = ${JSON.stringify(abi, null, 2)};\nexport const AUCTION_ABI_READY = true;\nexport const AUCTION_NONCE_FUNCTION = ${JSON.stringify(nonceFunction)};\n`);
+await writeFile(target, `// Imported from a compiled artifact; ORDER_TYPEHASH is also checked on-chain.\nexport const CARBON_DOUBLE_AUCTION_ABI = ${JSON.stringify(abi, null, 2)} as const;\nexport const AUCTION_NONCE_FUNCTION = ${JSON.stringify(nonceFunction)};\n`);
 console.log("Imported auction artifact. Configure the deployed address before signing.");

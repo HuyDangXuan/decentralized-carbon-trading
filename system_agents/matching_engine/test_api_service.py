@@ -71,6 +71,21 @@ class TestApiService(unittest.TestCase):
         got = self.client.get(f"/api/v1/orders/{oid(1)}").json()
         self.assertEqual((got["amount"], got["remaining_amount"], got["status"]), (5, 5, "NEW"))
 
+    def test_valid_flat_order_accepted(self):
+        message = {
+            "orderId": oid(100), "trader": self.alice.address, "orderType": 0, "tokenId": 101,
+            "amount": 5, "pricePerUnit": 10_000_000, "nonce": 0, "deadline": FUTURE,
+        }
+        sig = self.sign(KEY_ALICE, api_service.ORDER_TYPES, message)
+        flat_body = {
+            "order_id": oid(100), "trader": self.alice.address, "order_type": 0, "token_id": "101",
+            "amount": "5", "price_per_unit": "10000000", "time_in_force": 0, "nonce": "0",
+            "deadline": str(FUTURE), "signature": sig, "chain_id": 80002, "verifying_contract": CONTRACT,
+        }
+        r = self.post(flat_body)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json(), {"orderId": oid(100), "status": "NEW"})
+
     def test_signature_from_other_wallet_rejected(self):
         body = self.order_body(KEY_BOB, self.bob, 2, 0, 10, 5)
         body["order"]["trader"] = self.alice.address  # Bob ký nhưng khai là Alice
@@ -126,24 +141,6 @@ class TestApiService(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/sessions/1/matches").json()["matches"], r["matches"])
         self.assertEqual(self.client.get("/api/v1/sessions/current").json()["next_session_id"], 2)
         self.assertEqual(self.client.get("/api/v1/sessions/9/matches").status_code, 404)
-
-    def test_current_session_reports_status_and_close_time(self):
-        cur = self.client.get("/api/v1/sessions/current").json()
-        self.assertEqual((cur["status"], cur["closes_at"]), ("open", None))
-        app = api_service.create_app(agent=DoubleAuctionAgent(now_fn=lambda: 100), admin_key="k", verify_signatures=False, now_fn=lambda: 100)
-        c = TestClient(app)
-        self.assertEqual(c.post("/api/v1/sessions/window", json={"closes_at": 200}).status_code, 401)
-        self.assertEqual(c.post("/api/v1/sessions/window", json={"closes_at": 200}, headers={"X-API-Key": "k"}).status_code, 200)
-        self.assertEqual(c.get("/api/v1/sessions/current").json()["status"], "open")
-        c.post("/api/v1/sessions/window", json={"closes_at": 50}, headers={"X-API-Key": "k"})
-        cur = c.get("/api/v1/sessions/current").json()
-        self.assertEqual((cur["status"], cur["closes_at"]), ("closed", 50))
-
-    def test_cors_allows_configured_origin_only(self):
-        ok = self.client.options("/api/v1/orders", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "POST"})
-        self.assertEqual(ok.headers.get("access-control-allow-origin"), "http://localhost:3000")
-        bad = self.client.options("/api/v1/orders", headers={"Origin": "http://evil.example", "Access-Control-Request-Method": "POST"})
-        self.assertIsNone(bad.headers.get("access-control-allow-origin"))
 
     def test_session_run_requires_admin_key_when_configured(self):
         app = api_service.create_app(agent=DoubleAuctionAgent(), admin_key="s3cret", verify_signatures=False)

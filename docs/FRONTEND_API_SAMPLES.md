@@ -1,18 +1,16 @@
 # Mẫu dữ liệu API Matching Engine cho frontend (bàn giao cho Thắng)
 
-Người viết: Phi, 17/11/2026. Mọi mẫu dưới đây được **sinh từ chính engine** (`api_service.py`, 103 test pass), dùng khóa mẫu công khai không có tài sản, thời gian giả lập `now = 1800000000`. Địa chỉ hợp đồng là `CarbonDoubleAuction` trên Amoy: `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`.
+Người viết: Phi, 17–18/11/2026. Mọi mẫu dưới đây được **sinh từ chính engine** đã gộp với `main` (`api_service.py`, 102 test pass), dùng khóa mẫu công khai không có tài sản, thời gian giả lập `now = 1800000000`. Địa chỉ hợp đồng là `CarbonDoubleAuction` trên Amoy: `0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f`.
 
 ## Chạy engine cho frontend
 
 ```
 cd system_agents/matching_engine
-set AUCTION_CONTRACT_ADDRESS=0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f   # bắt buộc, nếu quên engine từ chối mọi chữ ký
-set MATCHING_API_KEY=<khóa admin, chỉ cho /sessions/run, /sessions/window>
-set CORS_ALLOW_ORIGINS=http://localhost:3000                            # origin của frontend, nhiều origin cách nhau bằng dấu phẩy
+set MATCHING_API_KEY=<khóa admin, chỉ cho /sessions/run>
 uvicorn api_service:app --port 8000
 ```
 
-CORS mặc định chỉ cho `http://localhost:3000` và `http://127.0.0.1:3000`. Phương thức cho phép: GET, POST, DELETE, OPTIONS; header: `Content-Type`, `X-API-Key`. Khóa admin **không** đặt trong frontend.
+Địa chỉ hợp đồng mặc định đã là địa chỉ trên (`DEFAULT_AUCTION_CONTRACT` trong `api_service.py`); chỉ đặt `AUCTION_CONTRACT_ADDRESS` khi đổi hợp đồng. CORS theo cấu hình của nhóm: cho mọi origin (`*`). Khóa admin **không** đặt trong frontend.
 
 ## Quy ước
 
@@ -23,33 +21,30 @@ CORS mặc định chỉ cho `http://localhost:3000` và `http://127.0.0.1:3000`
 
 ## 1. Trạng thái phiên: `GET /api/v1/sessions/current`
 
-Chưa đặt giờ đóng (luôn mở):
+Chu kỳ 5 phút theo ADR-001 demo: pha `CALL` (nhận lệnh, 270 giây đầu), `MATCH` (15 giây), `SETTLE` (15 giây cuối). Trả cả dạng snake_case và camelCase; `cutoff_at` là thời điểm đóng nhận lệnh, `phase_ends_at` là hết pha hiện tại (UNIX giây).
 
 ```json
 {
+  "session_id": "1",
+  "sessionId": "1",
   "next_session_id": 1,
   "last_session_id": 0,
-  "status": "open",
-  "closes_at": null
+  "phase": "CALL",
+  "duration_seconds": 300,
+  "durationSeconds": 300,
+  "cutoff_at": 1800000270,
+  "cutoffAt": 1800000270,
+  "phase_ends_at": 1800000270,
+  "phaseEndsAt": 1800000270,
+  "token_id": "101"
 }
 ```
 
-Sau khi admin đặt giờ đóng bằng `POST /api/v1/sessions/window` (header `X-API-Key`, body `{"closes_at": <UNIX giây>}`; `null` để bỏ giờ đóng). `status` thành `closed` khi qua `closes_at`:
-
-```json
-{
-  "next_session_id": 2,
-  "last_session_id": 1,
-  "status": "open",
-  "closes_at": 1800000600
-}
-```
-
-Lưu ý: engine **chưa tự chạy phiên** và chưa từ chối lệnh mới khi `status = closed`; `status` hiện chỉ để hiển thị. Việc chạy phiên vẫn do admin gọi `POST /api/v1/sessions/run`.
+Lưu ý: `phase` tính theo đồng hồ; engine **chưa tự chạy phiên** và chưa từ chối lệnh khi không ở pha `CALL`. Việc chạy phiên vẫn do admin gọi `POST /api/v1/sessions/run`.
 
 ## 2. Gửi lệnh: `POST /api/v1/orders`
 
-Body (lệnh mua, đã ký):
+Body (lệnh mua, đã ký). Engine cũng nhận dạng phẳng của frontend (`order_id`, `order_type`, `token_id`, `price_per_unit`, ... hoặc camelCase; `time_in_force` là `GTC`/`IOC` hoặc 0/1) và tự chuẩn hóa về dạng dưới đây:
 
 ```json
 {
@@ -273,4 +268,4 @@ Kết quả của `POST /api/v1/sessions/run` (admin):
 ## Chưa kiểm chứng
 
 - Mẫu ký ở trên do Python (`eth_account`) tạo. **Chưa thử với chữ ký sinh từ frontend thật**; nhờ Thắng gửi một lệnh đã ký để đối chiếu.
-- Chưa có phiên tự động đóng/mở theo giờ và chưa chặn lệnh khi `closed` (xem mục 1).
+- Pha phiên (`phase`) chỉ để hiển thị; chưa có bộ tự chạy phiên và chưa chặn lệnh ngoài pha `CALL` (xem mục 1).

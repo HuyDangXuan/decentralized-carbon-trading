@@ -29,7 +29,7 @@ import hmac
 import os
 import re
 import time
-from typing import Callable, Dict, Literal, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Literal, Optional, Set, Tuple
 
 from eth_account import Account
 from eth_account.messages import encode_typed_data
@@ -37,7 +37,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocke
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from auction_agent import ACTIVE_STATUSES, DoubleAuctionAgent, OrderStatus
 from order_book import Order, OrderType
@@ -51,6 +51,7 @@ ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 DOMAIN_NAME = "EPU Carbon Double Auction"
 DOMAIN_VERSION = "2.0"
 CHAIN_ID = 80002  # Polygon Amoy
+DEFAULT_AUCTION_CONTRACT = "0x6Ee8284848Cf08527175a321fF4B5C5b7e61c46f"
 ORDER_TYPES = {
     "Order": [
         {"name": "orderId", "type": "bytes32"},
@@ -87,16 +88,49 @@ class PlaceOrderRequest(BaseModel):
     order: OrderPayload
     signature: str
     time_in_force: Literal["GTC", "IOC"] = "GTC"
+    chain_id: Optional[int] = None
+    verifying_contract: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Hỗ trợ format phẳng được gửi từ frontend matchingApi.ts
+            if "order" not in data and ("order_id" in data or "orderId" in data):
+                raw_tif = data.get("time_in_force", "GTC")
+                if raw_tif == 0 or raw_tif == "0":
+                    tif = "GTC"
+                elif raw_tif == 1 or raw_tif == "1":
+                    tif = "IOC"
+                elif str(raw_tif).upper() in ("GTC", "IOC"):
+                    tif = str(raw_tif).upper()
+                else:
+                    tif = "GTC"
+
+                order_dict = {
+                    "orderId": data.get("order_id") or data.get("orderId"),
+                    "trader": data.get("trader"),
+                    "orderType": int(data.get("order_type") if data.get("order_type") is not None else data.get("orderType", 0)),
+                    "tokenId": int(data.get("token_id") if data.get("token_id") is not None else data.get("tokenId", 0)),
+                    "amount": int(data.get("amount", 0)),
+                    "pricePerUnit": int(data.get("price_per_unit") if data.get("price_per_unit") is not None else data.get("pricePerUnit", 0)),
+                    "nonce": int(data.get("nonce", 0)),
+                    "deadline": int(data.get("deadline", 0)),
+                }
+                return {
+                    "order": order_dict,
+                    "signature": data.get("signature", ""),
+                    "time_in_force": tif,
+                    "chain_id": data.get("chain_id") or data.get("chainId"),
+                    "verifying_contract": data.get("verifying_contract") or data.get("verifyingContract"),
+                }
+        return data
 
 
 class CancelOrderRequest(BaseModel):
     signature: str
     cancel_nonce: int = Field(ge=0, le=UINT256_MAX)
     deadline: int = Field(gt=0, le=UINT256_MAX)
-
-
-class SessionWindowRequest(BaseModel):
-    closes_at: Optional[int] = Field(default=None, gt=0, description="UNIX giây; null = không đặt giờ đóng")
 
 
 class RunSessionRequest(BaseModel):
@@ -148,7 +182,6 @@ def create_app(
     contract_address: Optional[str] = None,
     admin_key: Optional[str] = None,
     now_fn: Callable[[], float] = time.time,
-    cors_origins: Optional[list] = None,
 ) -> FastAPI:
     agent = agent or DoubleAuctionAgent(now_fn=now_fn)
     domain = {
@@ -156,7 +189,7 @@ def create_app(
         "version": DOMAIN_VERSION,
         "chainId": CHAIN_ID,
         "verifyingContract": contract_address
-        or os.environ.get("AUCTION_CONTRACT_ADDRESS", "0x" + "0" * 40),
+        or os.environ.get("AUCTION_CONTRACT_ADDRESS", DEFAULT_AUCTION_CONTRACT),
     }
     used_cancel_nonces: Set[Tuple[str, int]] = set()
     confirmed_hashes: Set[str] = set()
@@ -167,20 +200,14 @@ def create_app(
             raise HTTPException(401, "missing or wrong X-API-Key")
 
     app = FastAPI(title="CarbonChain Matching Engine API (mock)", version="0.1.0")
-    app.state.agent = agent
-
-    # CORS cho frontend (khác origin). Mặc định chỉ cho localhost dev; đặt CORS_ALLOW_ORIGINS="https://a,https://b" để đổi.
-    if cors_origins is None:
-        raw = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-        cors_origins = [o.strip() for o in raw.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "X-API-Key"],
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
-    # Giờ đóng nhận lệnh của phiên kế tiếp (tùy chọn, đặt qua POST /sessions/window); None = luôn mở.
-    window: Dict[str, Optional[int]] = {"closes_at": None}
+    app.state.agent = agent
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -242,7 +269,12 @@ def create_app(
                 # eth_account chấp nhận chữ ký biến dạng (s > n/2) nhưng hợp đồng thì không: bot sẽ tốn gas vô ích
                 raise HTTPException(401, "signature s-value is in the upper half of the curve (rejected on-chain)")
             try:
-                signer = _recover(domain, ORDER_TYPES, message, req.signature)
+                order_domain = dict(domain)
+                if req.chain_id:
+                    order_domain["chainId"] = req.chain_id
+                if req.verifying_contract:
+                    order_domain["verifyingContract"] = req.verifying_contract
+                signer = _recover(order_domain, ORDER_TYPES, message, req.signature)
             except ValueError:
                 raise HTTPException(401, "invalid signature")
             if signer != trader:
@@ -339,21 +371,37 @@ def create_app(
         return {"session_id": agent.session_id, "matches": payload}
 
     @app.get("/api/v1/sessions/current")
-    async def current_session() -> dict:
-        closes_at = window["closes_at"]
-        is_open = closes_at is None or now_fn() < closes_at
+    async def current_session(token_id: Optional[str] = None) -> dict:
+        now = int(now_fn())
+        cycle = 300  # 5 phút chu kỳ theo ADR-001 demo
+        elapsed = now % cycle
+        if elapsed < 270:
+            phase = "CALL"
+            cutoff_at = now + (270 - elapsed)
+            phase_ends_at = now + (270 - elapsed)
+        elif elapsed < 285:
+            phase = "MATCH"
+            cutoff_at = now - (elapsed - 270)
+            phase_ends_at = now + (285 - elapsed)
+        else:
+            phase = "SETTLE"
+            cutoff_at = now - (elapsed - 270)
+            phase_ends_at = now + (300 - elapsed)
+
         return {
+            "session_id": str(agent.session_id + 1),
+            "sessionId": str(agent.session_id + 1),
             "next_session_id": agent.session_id + 1,
             "last_session_id": agent.session_id,
-            "status": "open" if is_open else "closed",
-            "closes_at": closes_at,
+            "phase": phase,
+            "duration_seconds": 300,
+            "durationSeconds": 300,
+            "cutoff_at": cutoff_at,
+            "cutoffAt": cutoff_at,
+            "phase_ends_at": phase_ends_at,
+            "phaseEndsAt": phase_ends_at,
+            "token_id": token_id or "101",
         }
-
-    @app.post("/api/v1/sessions/window")
-    async def set_session_window(req: SessionWindowRequest, x_api_key: Optional[str] = Header(default=None)) -> dict:
-        _require_admin(x_api_key)
-        window["closes_at"] = req.closes_at
-        return {"closes_at": req.closes_at}
 
     @app.get("/api/v1/sessions/{session_id}/matches")
     async def session_matches(session_id: int) -> dict:

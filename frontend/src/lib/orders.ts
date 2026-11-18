@@ -1,11 +1,21 @@
-import { encodeAbiParameters, formatUnits, isAddress, keccak256, parseUnits, zeroAddress, type Address, type Hex } from "viem";
+import { encodeAbiParameters, formatUnits, isAddress, keccak256, parseUnits, stringToHex, zeroAddress, type Address, type Hex } from "viem";
 
 export enum OrderType { BID = 0, ASK = 1 }
 export enum TimeInForce { GTC = 0, IOC = 1 }
 export const MAX_UINT128 = (1n << 128n) - 1n;
 const MAX_UINT256 = (1n << 256n) - 1n;
-// SRS §3.4. Field order is part of the signature.
+// Deployed CarbonDoubleAuction EIP-712 Order struct (8 fields). Field order is part of the signature.
 export const ORDER_TYPES = {
+  Order: [
+    { name: "orderId", type: "bytes32" }, { name: "trader", type: "address" },
+    { name: "orderType", type: "uint8" }, { name: "tokenId", type: "uint256" },
+    { name: "amount", type: "uint128" }, { name: "pricePerUnit", type: "uint128" },
+    { name: "nonce", type: "uint256" }, { name: "deadline", type: "uint256" },
+  ],
+} as const;
+export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint256 nonce,uint256 deadline)";
+// Extended SRS §3.4 schema (9 fields, includes timeInForce) for forward compatibility.
+export const SRS_ORDER_TYPES = {
   Order: [
     { name: "orderId", type: "bytes32" }, { name: "trader", type: "address" },
     { name: "orderType", type: "uint8" }, { name: "tokenId", type: "uint256" },
@@ -14,7 +24,15 @@ export const ORDER_TYPES = {
     { name: "deadline", type: "uint256" },
   ],
 } as const;
-export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint8 timeInForce,uint256 nonce,uint256 deadline)";
+export const SRS_ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint8 timeInForce,uint256 nonce,uint256 deadline)";
+const AMOY_ORDER_TYPEHASH = keccak256(stringToHex(ORDER_TYPE_STRING));
+const SRS_ORDER_TYPEHASH = keccak256(stringToHex(SRS_ORDER_TYPE_STRING));
+
+export function resolveOrderSigning(typeHash: Hex) {
+  if (typeHash === AMOY_ORDER_TYPEHASH) return { types: ORDER_TYPES, signsTimeInForce: false as const };
+  if (typeHash === SRS_ORDER_TYPEHASH) return { types: SRS_ORDER_TYPES, signsTimeInForce: true as const };
+  throw new Error("Cấu trúc EIP-712 của hợp đồng chưa được hỗ trợ.");
+}
 export interface OrderParams {
   orderType: OrderType;
   tokenId: bigint;
@@ -23,9 +41,13 @@ export interface OrderParams {
   timeInForce: TimeInForce;
   deadline?: bigint;
 }
-export interface OrderMessage extends Omit<OrderParams, "deadline"> {
+export interface OrderMessage {
   orderId: Hex;
   trader: Address;
+  orderType: OrderType;
+  tokenId: bigint;
+  amount: bigint;
+  pricePerUnit: bigint;
   nonce: bigint;
   deadline: bigint;
 }
@@ -40,6 +62,7 @@ export interface SignedOrder {
   nonce: string;
   deadline: string;
   signature: Hex;
+  signsTimeInForce?: boolean;
   chainId: number;
   verifyingContract: Address;
 }
@@ -75,11 +98,20 @@ export function buildOrderMessage(trader: Address, params: OrderParams, nonce: b
   if (nonce < 0n || nonce > MAX_UINT256) throw new Error("Nonce không hợp lệ.");
   const deadline = params.deadline ?? now + 3600n;
   if (deadline <= now || deadline > MAX_UINT256) throw new Error("Thời hạn lệnh phải nằm trong tương lai.");
-  // Exact FR-04 formula. timeInForce is bound by the typed signature.
+  // Exact FR-04 formula. The deployed Amoy schema leaves timeInForce to the engine.
   // Identical seven-field orders share an ID and must be deduplicated by the API.
   const orderId = keccak256(encodeAbiParameters(
     [{ type: "address" }, { type: "uint8" }, { type: "uint256" }, { type: "uint128" }, { type: "uint128" }, { type: "uint256" }, { type: "uint256" }],
     [trader, params.orderType, params.tokenId, params.amount, params.pricePerUnit, nonce, deadline],
   ));
-  return { ...params, orderId, trader, nonce, deadline };
+  return {
+    orderId,
+    trader,
+    orderType: params.orderType,
+    tokenId: params.tokenId,
+    amount: params.amount,
+    pricePerUnit: params.pricePerUnit,
+    nonce,
+    deadline,
+  };
 }
