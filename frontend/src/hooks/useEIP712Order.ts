@@ -35,19 +35,27 @@ export function useEIP712Order(): UseEIP712OrderReturn {
       const code = await publicClient.getBytecode({ address: verifyingContract });
       if (!code || code === "0x") throw new Error("Địa chỉ cấu hình không chứa hợp đồng trên mạng này.");
       const typeHash = await publicClient.readContract({ address: verifyingContract, abi: CARBON_DOUBLE_AUCTION_ABI, functionName: "ORDER_TYPEHASH" });
-      const { types, signsTimeInForce } = resolveOrderSigning(typeHash);
+      const signing = resolveOrderSigning(typeHash);
       const nonce = await publicClient.readContract({ address: verifyingContract, abi: CARBON_DOUBLE_AUCTION_ABI, functionName: AUCTION_NONCE_FUNCTION, args: [address] });
       if (typeof nonce !== "bigint") throw new Error("Không đọc được nonce hiện tại từ hợp đồng.");
       const message = buildOrderMessage(address, params, nonce);
       const stillSameWallet = () => wallet.current.address === address && wallet.current.chainId === chainId;
       if (!stillSameWallet() || await walletClient.getChainId() !== chainId) throw new Error("Ví hoặc mạng đã đổi; hãy tạo lại lệnh.");
-      const signature = await signTypedDataAsync({ account: address, domain, types, primaryType: "Order", message });
+      const signature = signing.signsTimeInForce
+        ? await signTypedDataAsync({
+            account: address, domain, types: signing.types, primaryType: "Order",
+            message: { ...message, timeInForce: params.timeInForce },
+          })
+        : await signTypedDataAsync({
+            account: address, domain, types: signing.types, primaryType: "Order",
+            message,
+          });
       if (!stillSameWallet()) throw new Error("Ví hoặc mạng đã đổi trong lúc ký; lệnh chưa được gửi.");
       if (message.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Error("Lệnh đã hết hạn trong lúc chờ ký; hãy tạo lệnh mới.");
       const signed: SignedOrder = {
-        orderId: message.orderId, trader: address, orderType: message.orderType, timeInForce: message.timeInForce,
+        orderId: message.orderId, trader: address, orderType: message.orderType, timeInForce: params.timeInForce,
         tokenId: message.tokenId.toString(), amount: message.amount.toString(), pricePerUnit: message.pricePerUnit.toString(),
-        nonce: message.nonce.toString(), deadline: message.deadline.toString(), signature, signsTimeInForce, chainId, verifyingContract,
+        nonce: message.nonce.toString(), deadline: message.deadline.toString(), signature, signsTimeInForce: signing.signsTimeInForce, chainId, verifyingContract,
       };
       setLastSignedOrder(signed);
       return signed;

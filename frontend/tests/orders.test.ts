@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { concatHex, keccak256, toHex, verifyTypedData, zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { buildOrderMessage, getEIP712Domain, MAX_UINT128, microUsdcToUsd, ORDER_TYPES, OrderType, parseCreditAmount, parseTokenId, resolveOrderSigning, TimeInForce, usdToMicroUsdc } from "../src/lib/orders";
+import { buildOrderMessage, getEIP712Domain, MAX_UINT128, microUsdcToUsd, ORDER_TYPES, OrderType, parseCreditAmount, parseTokenId, resolveOrderSigning, SRS_ORDER_TYPES, TimeInForce, usdToMicroUsdc } from "../src/lib/orders";
 
 // Public deterministic test key. Never used for a network transaction.
 const account = privateKeyToAccount(`0x${"01".repeat(32)}`);
@@ -35,13 +35,13 @@ test("invalid network, empty contract and expired orders are blocked", () => {
   assert.throws(() => getEIP712Domain(80002, zeroAddress));
   assert.throws(() => buildOrderMessage(account.address, { ...params, deadline: 1000n }, 0n, 1000n));
 });
-test("signature binds GTC/IOC, nonce, chain and verifying contract", async () => {
+test("signature binds amount, nonce, chain and verifying contract", async () => {
   const domain = getEIP712Domain(80002, auction);
   const message = buildOrderMessage(account.address, params, 7n, 1000n);
   const data = { domain, types: ORDER_TYPES, primaryType: "Order" as const, message };
   const signature = await account.signTypedData(data);
   assert.equal(await verifyTypedData({ ...data, address: account.address, signature }), true);
-  for (const changed of [{ ...message, timeInForce: TimeInForce.IOC }, { ...message, nonce: 8n }]) {
+  for (const changed of [{ ...message, amount: 99n }, { ...message, nonce: 8n }]) {
     assert.equal(await verifyTypedData({ ...data, message: changed, address: account.address, signature }), false);
   }
   for (const changed of [{ ...domain, chainId: 11155111 }, { ...domain, verifyingContract: `0x${"33".repeat(20)}` as const }]) {
@@ -54,12 +54,13 @@ test("the deployed Amoy type hash selects the exact verified order schema", asyn
   assert.deepEqual(signing.types.Order.map(field => field.name), [
     "orderId", "trader", "orderType", "tokenId", "amount", "pricePerUnit", "nonce", "deadline",
   ]);
+  const message = buildOrderMessage(account.address, params, 7n, 1000n);
   const data = {
     domain: getEIP712Domain(80002, auction), types: signing.types, primaryType: "Order" as const,
-    message: buildOrderMessage(account.address, params, 7n, 1000n),
+    message,
   };
   const signature = await account.signTypedData(data);
   assert.equal(await verifyTypedData({ ...data, address: account.address, signature }), true);
-  assert.equal(await verifyTypedData({ ...data, types: ORDER_TYPES, address: account.address, signature }), false);
+  assert.equal(await verifyTypedData({ ...data, types: SRS_ORDER_TYPES, message: { ...message, timeInForce: params.timeInForce }, address: account.address, signature }), false);
   assert.throws(() => resolveOrderSigning(`0x${"00".repeat(32)}`), /chưa được hỗ trợ/);
 });

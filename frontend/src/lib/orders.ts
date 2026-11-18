@@ -4,8 +4,18 @@ export enum OrderType { BID = 0, ASK = 1 }
 export enum TimeInForce { GTC = 0, IOC = 1 }
 export const MAX_UINT128 = (1n << 128n) - 1n;
 const MAX_UINT256 = (1n << 256n) - 1n;
-// SRS §3.4. Field order is part of the signature.
+// Deployed CarbonDoubleAuction EIP-712 Order struct (8 fields). Field order is part of the signature.
 export const ORDER_TYPES = {
+  Order: [
+    { name: "orderId", type: "bytes32" }, { name: "trader", type: "address" },
+    { name: "orderType", type: "uint8" }, { name: "tokenId", type: "uint256" },
+    { name: "amount", type: "uint128" }, { name: "pricePerUnit", type: "uint128" },
+    { name: "nonce", type: "uint256" }, { name: "deadline", type: "uint256" },
+  ],
+} as const;
+export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint256 nonce,uint256 deadline)";
+// Extended SRS §3.4 schema (9 fields, includes timeInForce) for forward compatibility.
+export const SRS_ORDER_TYPES = {
   Order: [
     { name: "orderId", type: "bytes32" }, { name: "trader", type: "address" },
     { name: "orderType", type: "uint8" }, { name: "tokenId", type: "uint256" },
@@ -14,15 +24,13 @@ export const ORDER_TYPES = {
     { name: "deadline", type: "uint256" },
   ],
 } as const;
-export const ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint8 timeInForce,uint256 nonce,uint256 deadline)";
-const AMOY_ORDER_TYPE_STRING = ORDER_TYPE_STRING.replace(",uint8 timeInForce", "");
-const AMOY_ORDER_TYPES = { Order: ORDER_TYPES.Order.filter(field => field.name !== "timeInForce") } as const;
-const SRS_ORDER_TYPEHASH = keccak256(stringToHex(ORDER_TYPE_STRING));
-const AMOY_ORDER_TYPEHASH = keccak256(stringToHex(AMOY_ORDER_TYPE_STRING));
+export const SRS_ORDER_TYPE_STRING = "Order(bytes32 orderId,address trader,uint8 orderType,uint256 tokenId,uint128 amount,uint128 pricePerUnit,uint8 timeInForce,uint256 nonce,uint256 deadline)";
+const AMOY_ORDER_TYPEHASH = keccak256(stringToHex(ORDER_TYPE_STRING));
+const SRS_ORDER_TYPEHASH = keccak256(stringToHex(SRS_ORDER_TYPE_STRING));
 
 export function resolveOrderSigning(typeHash: Hex) {
-  if (typeHash === SRS_ORDER_TYPEHASH) return { types: ORDER_TYPES, signsTimeInForce: true };
-  if (typeHash === AMOY_ORDER_TYPEHASH) return { types: AMOY_ORDER_TYPES, signsTimeInForce: false };
+  if (typeHash === AMOY_ORDER_TYPEHASH) return { types: ORDER_TYPES, signsTimeInForce: false as const };
+  if (typeHash === SRS_ORDER_TYPEHASH) return { types: SRS_ORDER_TYPES, signsTimeInForce: true as const };
   throw new Error("Cấu trúc EIP-712 của hợp đồng chưa được hỗ trợ.");
 }
 export interface OrderParams {
@@ -33,9 +41,13 @@ export interface OrderParams {
   timeInForce: TimeInForce;
   deadline?: bigint;
 }
-export interface OrderMessage extends Omit<OrderParams, "deadline"> {
+export interface OrderMessage {
   orderId: Hex;
   trader: Address;
+  orderType: OrderType;
+  tokenId: bigint;
+  amount: bigint;
+  pricePerUnit: bigint;
   nonce: bigint;
   deadline: bigint;
 }
@@ -92,5 +104,14 @@ export function buildOrderMessage(trader: Address, params: OrderParams, nonce: b
     [{ type: "address" }, { type: "uint8" }, { type: "uint256" }, { type: "uint128" }, { type: "uint128" }, { type: "uint256" }, { type: "uint256" }],
     [trader, params.orderType, params.tokenId, params.amount, params.pricePerUnit, nonce, deadline],
   ));
-  return { ...params, orderId, trader, nonce, deadline };
+  return {
+    orderId,
+    trader,
+    orderType: params.orderType,
+    tokenId: params.tokenId,
+    amount: params.amount,
+    pricePerUnit: params.pricePerUnit,
+    nonce,
+    deadline,
+  };
 }
