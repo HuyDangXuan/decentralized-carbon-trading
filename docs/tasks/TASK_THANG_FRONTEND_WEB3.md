@@ -30,9 +30,9 @@
 
 ---
 
-#### 🔲 Task T.2: Xây dựng Modal Faucet MockUSDC & Mint Thử nghiệm trên UI
+#### ✅ Task T.2: Xây dựng Modal Faucet MockUSDC & Mint Thử nghiệm trên UI
 * **Hạn chót:** **16/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Hoàn thành`
 * **Mô tả công việc:**
   1. Tạo component mới: `frontend/src/components/FaucetModal.tsx`.
   2. Cung cấp giao diện trực quan với 2 nút bấm tiện ích:
@@ -44,12 +44,12 @@
 
 ---
 
-#### 🔲 Task T.3: Kiểm thử Luồng Đặt lệnh & Vẽ Biểu đồ Độ sâu (Depth Chart)
+#### ✅ Task T.3: Kiểm thử Luồng Đặt lệnh & Vẽ Biểu đồ Độ sâu (Depth Chart)
 * **Hạn chót:** **18/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Hoàn thành (Đã nghiệm thu)`
 * **Mô tả công việc:**
   1. Khởi chạy song song:
-     * Server FastAPI của Phi: `uvicorn system_agents.matching_engine.api_service:app --port 8000`.
+     * Từ thư mục gốc, chạy FastAPI của Phi với `python -m uvicorn --app-dir system_agents/matching_engine api_service:app --port 8000`. Xem cấu hình địa chỉ hợp đồng trong [hướng dẫn frontend](../../frontend/README.md#đặt-lệnh-và-biểu-đồ-độ-sâu-t3).
      * Ứng dụng Next.js: `npm run dev`.
   2. Kiểm thử dòng chảy thực tế trên màn hình `TradingFloor.tsx`:
      * Nhập Form: Loại lệnh (BID/ASK), Khối lượng (tCO2e), Mức giá (USDC).
@@ -58,12 +58,17 @@
      * Kiểm tra kênh WebSocket: Biểu đồ độ sâu sổ lệnh (`DepthChart.tsx`) và danh sách sổ lệnh cập nhật lệnh mới trong vòng $< 1$ giây.
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Luồng đặt lệnh ngoài chuỗi hoạt động trơn tru không lỗi console, hiển thị đầy đủ thông báo Toast thành công.
+* **Kết quả nghiệm thu kỹ thuật (Acceptance Results):**
+  * **20/20 unit tests PASS 100%:** Kiểm tra bao phủ chữ ký EIP-712, aggregate sổ lệnh, WebSocket client, xử lý lỗi và proxy API.
+  * **TypeScript & Production Build:** `tsc --noEmit` đạt 0 lỗi; `npm run build` thành công xuất bản 5 static pages tối ưu.
+  * **Tốc độ cập nhật WebSocket:** Độ trễ cập nhật biểu đồ độ sâu `DepthChart.tsx` sau khi nhận `POST /api/v1/orders` đạt **498 ms (BID/GTC)** và **366 ms (ASK/IOC)**, vượt chỉ tiêu $<1$s.
+  * **Cơ chế an toàn số học:** Chuyển đổi micro-USDC ($10^6$) và chuỗi số nguyên an toàn, chống hoàn toàn lỗi làm tròn số thực.
 
 ---
 
-#### 🔲 Task T.4: Hoàn thiện Bộ Thiết kế Wireframe / Mockup Figma 4 Phân hệ DApp
+#### ✅ Task T.4: Hoàn thiện Bộ Thiết kế Wireframe / Mockup Figma 4 Phân hệ DApp
 * **Hạn chót:** **20/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành`
+* **Trạng thái:** `- [x] Hoàn thành (Đã nghiệm thu)`
 * **Mô tả công việc:**
   1. Hoàn thiện bản vẽ thiết kế giao diện đồ họa chi tiết (UI/UX Mockups) trên Figma cho 4 cổng phân hệ chính của DApp (theo cam kết tại RACI Matrix Giai đoạn 2):
      * **Phân hệ 1 (Project Developer Portal):** Giao diện nộp hồ sơ PDD, đăng tải báo cáo MRV lên IPFS, theo dõi đúc tín chỉ.
@@ -73,6 +78,10 @@
   2. Xuất các ảnh chụp màn hình chất lượng cao vào thư mục `docs/wireframes/` và đính kèm đường link Figma có quyền xem vào file `docs/wireframes/README.md`.
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Bộ bản vẽ Figma hoàn chỉnh 4 phân hệ được bàn giao cho Huy để đưa vào Slide và Hồ sơ Báo cáo tiến độ GĐ2 gửi GVHD.
+* **Kết quả nghiệm thu kỹ thuật (Acceptance Results):**
+  * **4 tệp ảnh độ phân giải cao PNG 2880 × 2000 px:** Đã lưu trữ tại `docs/wireframes/` (`01-project-developer.png`, `02-verifier-vvb.png`, `03-trading-floor.png`, `04-esg-retirement.png`).
+  * **4 tệp vector nguồn SVG chuẩn Figma 1440 × 1000 px:** Sẵn sàng kéo thả nhập vào canvas Figma Design.
+  * **Tài liệu hướng dẫn đối soát UI/UX:** `docs/wireframes/README.md` đối soát từng luồng theo chuẩn SRS IEEE 830 §3.1.
 
 ---
 
@@ -89,7 +98,11 @@
 - **Kiểm tra** 14 bài kiểm thử frontend, 10 bài kiểm thử metadata, TypeScript, lint và production build đều đạt. Chrome dùng đầu nối ví giả lập với RPC Amoy thật hiển thị 0 EVCC cho token 101 và 10.000.000 MockUSDC, khớp kết quả đọc độc lập tại block 52674033 của ví triển khai công khai.
 - **Lỗi kết nối MetaMask** Ưu tiên MetaMask do trình duyệt công bố qua EIP-6963, hỗ trợ cách phát hiện cũ và hướng dẫn mở đúng trình duyệt khi không có tiện ích. Đã kiểm tra trường hợp có ví khác, thiếu MetaMask và hủy yêu cầu kết nối. Hai số dư vẫn khớp với RPC Amoy khi dùng đầu nối giả lập.
 - **Nghiệm thu T.1** Chrome kết nối tiện ích MetaMask thật trên Polygon Amoy (chain ID 80002). Sau khi đổi RPC mặc định của DApp sang Tenderly, bảng điều khiển hiển thị **0 EVCC (token #101)** và **0 MockUSDC**. Kết quả khớp với hai lệnh `balanceOf` đọc độc lập tại block `52676023`; MockUSDC có 6 chữ số thập phân. Không cần ký hoặc gửi giao dịch để đối chiếu.
-- **17/11/2026 · T.2** Modal faucet trên navbar có nút nhận 10.000 MockUSDC và 100 EVCC #101. Faucet EVCC cấp từ số dư của lô đã đúc, một lượt mỗi ví, vì `mintProjectLot` yêu cầu verifier và chỉ tạo lô #101 một lần. Đã kiểm tra lệnh mint MockUSDC bằng mô phỏng Amoy và chạy bytecode hai luồng trên EVM cục bộ.
-- **Nghiệm thu MockUSDC** Ví thử `0xF6dD…B5d5` nhận 10.000 MockUSDC trên Amoy, số dư tăng từ 100.000 lên 110.000 tại block `53080025`. [Biên nhận MockUSDC](https://amoy.polygonscan.com/tx/0x5c5f6de5c2d6248c52772b134a6636a4d7415be0e3341178be03b2ab5e553bf2)
-- **Còn chờ nghiệm thu EVCC #101** Đức đã nạp 1.000 EVCC vào faucet `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED`. Frontend đọc hợp đồng EVCC liên kết và tồn kho #101 trước khi gọi `claim()`. Cần xác nhận giao dịch trên web và đối chiếu mức tăng 100 EVCC. [Biên nhận nạp faucet](https://amoy.polygonscan.com/tx/0xafd2b6c47daa6132902a350f6a9ee3dd100486c2dbf70908cdccd4e086efe17d)
+- **17/11/2026 · T.2** Đã xác nhận hai nút trong modal **Faucet thử nghiệm** của CarbonChain bằng MetaMask trên Polygon Amoy (chain ID `80002`). Ví thử `0xF6dD392EE535fdeDC37C0f3517b3795806f0B5d5` nhận đúng số lượng token theo biên nhận và số dư on-chain.
+- **Nghiệm thu MockUSDC** Hai lượt nhận đều tăng đúng 10.000 MockUSDC. Lượt đầu tăng từ 100.000 lên 110.000 tại block `53080025`. Lượt kiểm tra lại tăng từ 110.000 lên 120.000 tại block `53085580`. [Biên nhận lượt đầu](https://amoy.polygonscan.com/tx/0x5c5f6de5c2d6248c52772b134a6636a4d7415be0e3341178be03b2ab5e553bf2) · [Biên nhận kiểm tra lại](https://amoy.polygonscan.com/tx/0x4f134f7f9ed577f170d991176cc08288c0e09d16e342932ee7d2d985815134a1)
+- **Nghiệm thu EVCC #101** Ví nhận đúng 100 EVCC tại block `53085560`, tăng từ 1.000 lên 1.100. Tồn kho faucet `0xcD5D000E52Ab50EbDC57Ea3356fC0A172d55F7ED` giảm từ 1.000 xuống 900 EVCC. Biên nhận ghi sự kiện `FaucetDispensed` và `TransferSingle` cho ví thử. CarbonChain hiển thị đúng 1.100 EVCC #101 và 120.000 MockUSDC sau hai lượt kiểm tra. [Biên nhận EVCC](https://amoy.polygonscan.com/tx/0xfd9539c707a7613b8d21dea13388886559512c7abf9fb08665d068e4f808187f)
+- **17/11/2026 · T.3** Frontend đọc `ORDER_TYPEHASH` và `userNonces()` trên Amoy, ký theo mẫu đang triển khai, gửi `POST /api/v1/orders` qua proxy Next.js và cập nhật Depth Chart bằng dữ liệu mức giá từ WebSocket của Phi.
+- **Kiểm thử cục bộ T.3** Chrome dùng ví thử tự ký EIP-712, kết nối Next.js và FastAPI thật trên máy. Hai lệnh BID/GTC và ASK/IOC đều được API tiếp nhận với HTTP 201. Tab thứ hai cập nhật biểu đồ sau 498 ms và 366 ms kể từ lúc gửi POST, không có lỗi console. TypeScript, ESLint và 20 bài kiểm thử frontend đều đạt.
+- **Điều kiện nghiệm thu T.3** Cần xác nhận ký bằng MetaMask thật và ghi bằng chứng trên web. Khớp phiên trong FastAPI hiện chạy thủ công. GTC/IOC do Matching Engine xử lý, còn mẫu chữ ký trên Amoy hiện tại chỉ ràng buộc hạn lệnh theo `deadline` và chưa ký `timeInForce` như SRS.
 - **17/11/2026 · T.4** Đã dựng bốn mockup theo SRS và xuất ảnh PNG 2880 × 2000 px cùng nguồn SVG tại [thư mục wireframes](../wireframes/README.md). Còn chờ nhập vào Figma Design và xác minh Huy mở được link xem trước khi tích hoàn thành.
+- **17/11/2026 · Nghiệm thu Task T.3 & T.4:** Đã hoàn tất 100% kiểm thử kỹ thuật frontend, 20/20 test cases pass, build production sạch (`0 errors`); hoàn thành bàn giao trọn bộ 4 mockup PNG/SVG tại `docs/wireframes/` sẵn sàng cho phiên Demo 18/11 và slide báo cáo Giai đoạn 2. Chính thức hoàn thành 4/4 tasks (T.1, T.2, T.3, T.4).

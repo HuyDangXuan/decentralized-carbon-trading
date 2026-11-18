@@ -1,9 +1,8 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
 import { useAccount, usePublicClient, useSignTypedData, useWalletClient } from "wagmi";
-import { keccak256, stringToHex } from "viem";
-import { AUCTION_ABI_READY, AUCTION_NONCE_FUNCTION, CARBON_DOUBLE_AUCTION_ABI, requireContractAddress } from "../contracts";
-import { buildOrderMessage, getEIP712Domain, ORDER_TYPES, ORDER_TYPE_STRING, type OrderParams, type SignedOrder } from "../lib/orders";
+import { AUCTION_NONCE_FUNCTION, CARBON_DOUBLE_AUCTION_ABI, requireContractAddress } from "../contracts";
+import { buildOrderMessage, getEIP712Domain, resolveOrderSigning, type OrderParams, type SignedOrder } from "../lib/orders";
 export { OrderType, TimeInForce, usdToMicroUsdc, microUsdcToUsd } from "../lib/orders";
 export type { OrderParams, SignedOrder } from "../lib/orders";
 export interface UseEIP712OrderReturn {
@@ -32,24 +31,31 @@ export function useEIP712Order(): UseEIP712OrderReturn {
     try {
       if (!address || !chainId || !publicClient || !walletClient) throw new Error("Kết nối ví trên Polygon Amoy hoặc Sepolia trước khi ký.");
       const verifyingContract = requireContractAddress(chainId, "carbonDoubleAuction");
-      if (!AUCTION_ABI_READY) throw new Error("Đang chờ ABI đấu giá v2 được xuất từ hợp đồng đã kiểm thử.");
       const domain = getEIP712Domain(chainId, verifyingContract);
       const code = await publicClient.getBytecode({ address: verifyingContract });
       if (!code || code === "0x") throw new Error("Địa chỉ cấu hình không chứa hợp đồng trên mạng này.");
       const typeHash = await publicClient.readContract({ address: verifyingContract, abi: CARBON_DOUBLE_AUCTION_ABI, functionName: "ORDER_TYPEHASH" });
-      if (typeHash !== keccak256(stringToHex(ORDER_TYPE_STRING))) throw new Error("Cấu trúc EIP-712 của hợp đồng chưa khớp SRS hiện tại.");
+      const signing = resolveOrderSigning(typeHash);
       const nonce = await publicClient.readContract({ address: verifyingContract, abi: CARBON_DOUBLE_AUCTION_ABI, functionName: AUCTION_NONCE_FUNCTION, args: [address] });
       if (typeof nonce !== "bigint") throw new Error("Không đọc được nonce hiện tại từ hợp đồng.");
       const message = buildOrderMessage(address, params, nonce);
       const stillSameWallet = () => wallet.current.address === address && wallet.current.chainId === chainId;
       if (!stillSameWallet() || await walletClient.getChainId() !== chainId) throw new Error("Ví hoặc mạng đã đổi; hãy tạo lại lệnh.");
-      const signature = await signTypedDataAsync({ account: address, domain, types: ORDER_TYPES, primaryType: "Order", message });
+      const signature = signing.signsTimeInForce
+        ? await signTypedDataAsync({
+            account: address, domain, types: signing.types, primaryType: "Order",
+            message: { ...message, timeInForce: params.timeInForce },
+          })
+        : await signTypedDataAsync({
+            account: address, domain, types: signing.types, primaryType: "Order",
+            message,
+          });
       if (!stillSameWallet()) throw new Error("Ví hoặc mạng đã đổi trong lúc ký; lệnh chưa được gửi.");
       if (message.deadline <= BigInt(Math.floor(Date.now() / 1000))) throw new Error("Lệnh đã hết hạn trong lúc chờ ký; hãy tạo lệnh mới.");
       const signed: SignedOrder = {
         orderId: message.orderId, trader: address, orderType: message.orderType, timeInForce: params.timeInForce,
         tokenId: message.tokenId.toString(), amount: message.amount.toString(), pricePerUnit: message.pricePerUnit.toString(),
-        nonce: message.nonce.toString(), deadline: message.deadline.toString(), signature, chainId, verifyingContract,
+        nonce: message.nonce.toString(), deadline: message.deadline.toString(), signature, signsTimeInForce: signing.signsTimeInForce, chainId, verifyingContract,
       };
       setLastSignedOrder(signed);
       return signed;

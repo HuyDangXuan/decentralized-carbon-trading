@@ -1,6 +1,5 @@
 // Imported from a compiled artifact; ORDER_TYPEHASH is also checked on-chain.
-import type { Abi } from "viem";
-export const CARBON_DOUBLE_AUCTION_ABI: Abi = [
+export const CARBON_DOUBLE_AUCTION_ABI = [
   {
     "inputs": [
       {
@@ -1254,6 +1253,5 @@ export const CARBON_DOUBLE_AUCTION_ABI: Abi = [
     "stateMutability": "view",
     "type": "function"
   }
-];
-export const AUCTION_ABI_READY = true;
+] as const;
 export const AUCTION_NONCE_FUNCTION = "userNonces";

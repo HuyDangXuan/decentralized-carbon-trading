@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MatchingApiClient } from "../src/services/matchingApi";
+import { MatchingApiClient, sessionAcceptsOrders } from "../src/services/matchingApi";
 import { OrderType, TimeInForce, type SignedOrder } from "../src/lib/orders";
 
 const id = `0x${"11".repeat(32)}` as const;
@@ -9,8 +9,8 @@ const signed: SignedOrder = { orderId: id, trader: address, verifyingContract: a
 const rawOrder = { order_id: id, trader: address, order_type: 0, token_id: "101", amount: "9007199254740993", remaining_amount: "3", price_per_unit: "14500001", status: "ROLLED_OVER", rollover_count: 1 };
 function fetchJson(payload: unknown, code = 200): typeof fetch { return async () => new Response(JSON.stringify(payload), { status: code }); }
 
-test("submission sends signed fields as exact strings including time_in_force", async () => {
-  let sent: Record<string, unknown> = {};
+test("submission wraps signed fields in FastAPI's order object without losing integer precision", async () => {
+  let sent: unknown;
   const fetcher: typeof fetch = async (url, init) => {
     assert.equal(url, "http://engine/api/v1/orders");
     assert.equal(init?.method, "POST");
@@ -19,16 +19,32 @@ test("submission sends signed fields as exact strings including time_in_force", 
   };
   const result = await new MatchingApiClient("http://engine/", fetcher).submitOrder(signed);
   assert.equal(result.success, true);
-  assert.equal(sent.amount, signed.amount);
-  assert.equal(sent.time_in_force, 1);
-  assert.equal(sent.nonce, "7");
-  assert.equal(sent.verifying_contract, address);
+  assert.deepEqual(sent, {
+    order: {
+      orderId: id, trader: address, orderType: 0, tokenId: "101", amount: signed.amount,
+      pricePerUnit: "14500001", nonce: "7", deadline: "2000000000",
+    },
+    signature: signed.signature,
+    time_in_force: "IOC",
+  });
 });
-test("snake_case and success envelopes normalize orderbook without losing integers", async () => {
-  const payload = { success: true, data: { token_id: "101", bids: [rawOrder], asks: [] } };
+test("the FastAPI aggregate book preserves amounts and sorts levels in market order", async () => {
+  const payload = { success: true, data: { token_id: "101", bids: [
+    { price: 14000000, amount: 2, orders: 1 },
+    { price: "14500001", amount: "9007199254740993", orders: 2 },
+  ], asks: [] } };
   const result = await new MatchingApiClient("http://engine", fetchJson(payload)).getOrderBook("101");
-  assert.equal(result.data?.bids[0].amount, "9007199254740993");
-  assert.equal(result.data?.bids[0].rolloverCount, 1);
+  assert.deepEqual(result.data?.bids, [
+    { pricePerUnit: "14500001", remainingAmount: "9007199254740993", orderCount: 2 },
+    { pricePerUnit: "14000000", remainingAmount: "2", orderCount: 1 },
+  ]);
+});
+test("individual orders aggregate at each price while order detail remains per-order", async () => {
+  const book = await new MatchingApiClient("http://engine", fetchJson({ bids: [rawOrder, { ...rawOrder, remaining_amount: "4" }], asks: [] })).getOrderBook("101");
+  assert.deepEqual(book.data?.bids, [{ pricePerUnit: "14500001", remainingAmount: "7", orderCount: 2 }]);
+  const detail = await new MatchingApiClient("http://engine", fetchJson(rawOrder)).getOrder(id);
+  assert.equal(detail.data?.amount, "9007199254740993");
+  assert.equal(detail.data?.rolloverCount, 1);
 });
 test("wrong tokens, unsafe numbers, floating prices and unknown statuses fail closed", async () => {
   for (const change of [{ token_id: "102" }, { amount: 9007199254740993 }, { price_per_unit: "14.5" }, { status: "SUCCESS" }, { remaining_amount: "9999999999999999999999" }, { order_type: 1 }]) {
@@ -44,8 +60,18 @@ test("FastAPI validation errors become readable text", async () => {
 });
 test("session timer uses explicit server phase and timestamps", async () => {
   const result = await new MatchingApiClient("http://engine", fetchJson({ session_id: "s1", phase: "CALL", duration_seconds: 300, cutoff_at: 2000000000, phase_ends_at: 2000000000 })).getCurrentSession("101");
-  assert.equal(result.data?.cutoffAt, 2000000000);
-  assert.equal(result.data?.durationSeconds, 300);
+  assert.equal(result.data?.mode, "scheduled");
+  assert.equal(result.data?.mode === "scheduled" && result.data.durationSeconds, 300);
+  assert.equal(sessionAcceptsOrders(result.data ?? null, 1999999999), true);
+  assert.equal(sessionAcceptsOrders(result.data ?? null, 2000000000), false);
+});
+test("a pair of session IDs enables manual mode without fabricating a timer", async () => {
+  const api = new MatchingApiClient("http://engine", fetchJson({ next_session_id: 2, last_session_id: 1 }));
+  const result = await api.getCurrentSession("101");
+  assert.deepEqual(result.data, { mode: "manual", sessionId: "2", tokenId: "101" });
+  assert.equal(sessionAcceptsOrders(result.data ?? null), true);
+  const malformed = await new MatchingApiClient("http://engine", fetchJson({ next_session_id: 8, last_session_id: 1 })).getCurrentSession("101");
+  assert.equal(malformed.success, false);
 });
 test("a timeout aborts the request and never retries a POST", async () => {
   let calls = 0;
