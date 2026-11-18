@@ -119,8 +119,9 @@ def ensure_daily_log(date_str, title=None):
 
     content += f"""
 ### 2.3 Ghi chú Kiến trúc & Đặc tả Kỹ thuật
-- Xem chi tiết hồ sơ SRS chuẩn IEEE 830 tại [`docs/SRS_DOCUMENT.md`](../../SRS_DOCUMENT.md).
-- Xem 4 quyết định kiến trúc cốt lõi tại [`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](../../ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md).
+- Xem chi tiết hồ sơ SRS chuẩn IEEE 830 tại [`docs/specs/SRS_DOCUMENT.md`](../../specs/SRS_DOCUMENT.md).
+- Xem 4 quyết định kiến trúc cốt lõi tại [`docs/architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](../../architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md).
+- Xem bản đồ quản trị tài liệu dự án tại [`docs/README.md`](../../README.md).
 
 ---
 

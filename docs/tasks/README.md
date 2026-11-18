@@ -13,14 +13,15 @@
 
 | Thành viên | Phân hệ chuyên trách | Tệp giao việc cá nhân | Trạng thái hiện tại |
 | :--- | :--- | :---: | :---: |
-| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`TASK_DUC_SMART_CONTRACT.md`](TASK_DUC_SMART_CONTRACT.md) | 🟢 **HOÀN THÀNH VƯỢT TIẾN ĐỘ (Đ.1 – Đ.4)** |
-| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`TASK_PHI_AUCTION_ENGINE.md`](TASK_PHI_AUCTION_ENGINE.md) | 🟢 **HOÀN THÀNH P.1, P.3, P.4 (P.2 ĐANG MỞ RỘNG)** |
-| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`TASK_THANG_FRONTEND_WEB3.md`](TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH 100% CÁC TASK (T.1 – T.4)** |
-| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`TASK_HUY_LEAD_COORDINATION.md`](TASK_HUY_LEAD_COORDINATION.md) | 🟢 **HOÀN THÀNH H.1, H.2, H.3, H.4** |
+| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`2026-11-12/TASK_DUC_SMART_CONTRACT.md`](2026-11-12/TASK_DUC_SMART_CONTRACT.md) | 🟢 **HOÀN THÀNH 100% (Đ.1 – Đ.4)** |
+| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`2026-11-12/TASK_PHI_AUCTION_ENGINE.md`](2026-11-12/TASK_PHI_AUCTION_ENGINE.md) | 🟢 **HOÀN THÀNH 100% (P.1 – P.4)** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`2026-11-12/TASK_THANG_FRONTEND_WEB3.md`](2026-11-12/TASK_THANG_FRONTEND_WEB3.md) | 🟢 **HOÀN THÀNH 100% (T.1 – T.4)** |
+| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`2026-11-12/TASK_HUY_LEAD_COORDINATION.md`](2026-11-12/TASK_HUY_LEAD_COORDINATION.md) | 🟢 **HOÀN THÀNH 100% (H.1 – H.4)** |
 
 ---
 
 ## 📊 BẢNG KANBAN TỔNG THỂ TIẾN ĐỘ SPRINT (12/11 – 20/11/2026)
+> **TỔNG KẾT SPRINT:** 🟢 **ĐÃ NGHIỆM THU HOÀN THÀNH 100% (16/16 TASKS)**. Toàn bộ các hạng mục đã đóng gói và lưu vết tại gói giao việc [`docs/tasks/2026-11-12/`](2026-11-12/).
 
 | Mã Task | Hạng mục công việc chi tiết | Phụ trách | Hạn chót | Trạng thái | Sản phẩm bàn giao |
 | :---: | :--- | :---: | :---: | :---: | :--- |
@@ -29,9 +30,9 @@
 | **Đ.3** | Tạo tệp `docs/DEPLOYED_ADDRESSES.md` cấp địa chỉ cho nhóm | Đức | 14/11 | [x] Hoàn thành | Tệp `docs/DEPLOYED_ADDRESSES.md` bàn giao nhóm |
 | **Đ.4** | Đo lường và cập nhật Benchmark Gas thực tế trên Amoy | Đức | 16/11 | [x] Hoàn thành | Cập nhật Mục 5 `SMART_CONTRACT_SPEC.md` (>52% gas savings) |
 | **P.1** | Viết Bot Settlement Submitter (`settlement_submitter.py`) | Phi | 15/11 | [x] Hoàn thành | Bot chạy thật thành công trên Amoy (Tx: `0x9619ff0b...75b8`) |
-| **P.2** | Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$) | Phi | 17/11 | [⏳] Đang mở rộng | Script `equilibrium_crosscheck.py` & số liệu tạm thời $m \le 64$ |
+| **P.2** | Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$) | Phi | 17/11 | [x] Hoàn thành | Nghiệm thu số liệu $m \le 64$ ($k=1$), log-log, thảo luận finite sample |
 | **P.3** | Biên soạn Tài liệu Đe dọa Bảo mật `docs/THREAT_MODELING.md` | Phi | 18/11 | [x] Hoàn thành | Tệp `docs/THREAT_MODELING.md` qua review độc lập |
-| **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [x] Hoàn thành | Cập nhật `docs/MATCHING_ENGINE_SPEC.md` chuẩn [CS83], [RSW94] |
+| **P.4** | Đọc bài báo gốc & Chuẩn hóa học thuật $k$-DA vs Marginal | Phi | 20/11 | [x] Hoàn thành | Phê duyệt Phương án A (`marginal`) và GTC 3 phiên theo [ADR_001] |
 | **T.1** | Nhận địa chỉ Contract từ Đức và cấu hình `frontend/.env.local` | Thắng | 15/11 | [x] Hoàn thành | MetaMask trên Amoy; đọc số dư EVCC và MockUSDC chính xác |
 | **T.2** | Xây dựng Modal Faucet MockUSDC & Mint thử trên UI | Thắng | 16/11 | [x] Hoàn thành | Nhận 10.000 MockUSDC và 100 EVCC #101 từ web, có biên nhận Amoy |
 | **T.3** | Kiểm thử luồng Form đặt lệnh $\to$ Ký EIP-712 $\to$ Vẽ Depth Chart | Thắng | 18/11 | [x] Hoàn thành | Luồng đặt lệnh & WebSocket Depth Chart test pass 100% (<500ms) |

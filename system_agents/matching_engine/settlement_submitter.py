@@ -470,7 +470,7 @@ class SettlementSubmitter:
         self.deadline_margin = deadline_margin  # giây: trade sắp hết hạn có thể hết hạn trước khi block được đào
         self.check_funds = check_funds  # kiểm số dư và allowance trước khi gửi (tắt chỉ để thử đường FAILED)
         # Bên mua có mã (hợp đồng hoặc EOA ủy quyền EIP-7702) có thể đốt gas trong hook onERC1155Received
-        # (xem docs/THREAT_MODELING.md mục 5.5); mặc định bỏ qua trade của họ.
+        # (xem docs/specs/THREAT_MODELING.md mục 5.5); mặc định bỏ qua trade của họ.
         self.allow_contract_traders = allow_contract_traders
 
     def precheck(self, trades: Sequence[PreparedTrade]) -> Tuple[List[PreparedTrade], List[TradeOutcome]]:

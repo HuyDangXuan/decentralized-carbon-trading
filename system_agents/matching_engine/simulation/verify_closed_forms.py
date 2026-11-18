@@ -1,7 +1,7 @@
 """Kiểm chứng công thức đóng (hệ số cân bằng, hiệu quả tiệm cận) bằng mô phỏng lớn.
 
 Chạy: python verify_closed_forms.py (mất khoảng 20-30 giây).
-Dự đoán đối chiếu (suy ra độc lập bởi nhiều bên, xem docs/MATCHING_ENGINE_SPEC.md mục 9.6):
+Dự đoán đối chiếu (suy ra độc lập bởi nhiều bên, xem docs/specs/MATCHING_ENGINE_SPEC.md mục 9.6):
   - hệ số: bid = k(1-k)/(2(1+k)) + v/(1+k), ask = (1-k)/2 + c/(2-k);
   - hiệu quả tiệm cận k = 0.5: 1 - lam^2 / (4 (3 - lam)^2); với lam = 1: 1 - (1 - k + k^2)^2 / 9.
 """

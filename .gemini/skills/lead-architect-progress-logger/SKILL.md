@@ -16,7 +16,7 @@ Kỹ năng này trao quyền cho trợ lý AI Antigravity tự động hóa toà
 1. Chạy `git status` để lấy danh sách tệp Modified, Untracked, Staged, Deleted.
 2. Chạy `git diff` và `git log -3 --stat` để phân tích chi tiết nội dung thay đổi.
 3. Phân loại thay đổi theo các phân hệ:
-   - Kiến trúc & SRS (`docs/SRS_DOCUMENT.md`, `docs/SYSTEM_ARCHITECTURE.md`, `docs/ADR_...`)
+   - Kiến trúc & SRS (`docs/specs/SRS_DOCUMENT.md`, `docs/architecture/SYSTEM_ARCHITECTURE.md`, `docs/architecture/ADR_...`)
    - Smart Contract (`contracts/`)
    - Thuật toán Matching Engine (`system_agents/matching_engine/`)
    - Frontend DApp (`frontend/`, `docs/METADATA_SCHEMA.json`)

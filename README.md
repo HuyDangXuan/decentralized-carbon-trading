@@ -23,8 +23,9 @@ Dự án kết hợp giữa **Công nghệ Blockchain (ERC-1155, Smart Contracts
 
 - 📂 **Thư mục theo dõi tiến độ tổng thể:** [`docs/progress/`](docs/progress/README.md)
 - 📝 **Nhật ký mới nhất [11/11/2026]:** [`docs/progress/2026-11-11/`](docs/progress/2026-11-11/README.md) *(Hợp nhất toàn diện 3 phân hệ vào main, giải quyết xung đột Git, kiểm thử tích hợp chéo thành công và khởi tạo hệ thống giao việc docs/tasks/)*.
-- 📋 **Hồ sơ Đặc tả Yêu cầu Phần mềm SRS (IEEE 830):** [`docs/SRS_DOCUMENT.md`](docs/SRS_DOCUMENT.md)
-- ⚖️ **Quyết định Kiến trúc Cốt lõi (ADR-001):** [`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md)
+- 📋 **Hồ sơ Đặc tả Yêu cầu Phần mềm SRS (IEEE 830):** [`docs/specs/SRS_DOCUMENT.md`](docs/specs/SRS_DOCUMENT.md)
+- ⚖️ **Quyết định Kiến trúc Cốt lõi (ADR-001):** [`docs/architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md)
+- 📚 **Cẩm nang & Bản đồ Quản trị Tài liệu:** [`docs/README.md`](docs/README.md)
 
 ---
 
@@ -33,17 +34,17 @@ Dự án kết hợp giữa **Công nghệ Blockchain (ERC-1155, Smart Contracts
 Để tránh tình trạng quá tải thông tin và giúp từng thành viên tập trung tối đa vào phần việc chuyên trách của mình, toàn bộ nhiệm vụ của Sprint Tích hợp Hệ thống (12/11 – 20/11/2026) được quản trị trực tiếp tại thư mục **[`docs/tasks/`](docs/tasks/README.md)**:
 
 - 📊 **Bảng điều khiển Kanban tổng thể:** [`docs/tasks/README.md`](docs/tasks/README.md)
-- 📜 **Kế hoạch Sprint chi tiết toàn nhóm:** [`docs/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md`](docs/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md)
+- 📜 **Kế hoạch Sprint chi tiết toàn nhóm:** [`docs/planning/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md`](docs/planning/KE_HOACH_PHAN_CONG_NHIEM_VU_CHI_TIET_SPRINT_TICH_HOP.md)
 
 ### 📌 File Giao việc Cá nhân theo Từng Thành viên:
 Mỗi thành viên chỉ cần mở đúng tệp mang tên mình dưới đây để theo dõi các đầu việc chi tiết, câu lệnh kỹ thuật, tiêu chí nghiệm thu và tự tích dấu `[x]` khi hoàn thành:
 
 | Thành viên | Phân hệ phụ trách | Tệp giao việc cá nhân | Hạn chót Sprint |
 | :--- | :--- | :---: | :---: |
-| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`docs/tasks/TASK_DUC_SMART_CONTRACT.md`](docs/tasks/TASK_DUC_SMART_CONTRACT.md) | **16/11/2026** |
-| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`docs/tasks/TASK_PHI_AUCTION_ENGINE.md`](docs/tasks/TASK_PHI_AUCTION_ENGINE.md) | **20/11/2026** |
-| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`docs/tasks/TASK_THANG_FRONTEND_WEB3.md`](docs/tasks/TASK_THANG_FRONTEND_WEB3.md) | **20/11/2026** |
-| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`docs/tasks/TASK_HUY_LEAD_COORDINATION.md`](docs/tasks/TASK_HUY_LEAD_COORDINATION.md) | **20/11/2026** |
+| **Nguyễn Hoàng Đức** | Smart Contract & On-chain Settlement (Polygon Amoy) | [`docs/tasks/2026-11-12/TASK_DUC_SMART_CONTRACT.md`](docs/tasks/2026-11-12/TASK_DUC_SMART_CONTRACT.md) | **16/11/2026** |
+| **Nguyễn Bảo Phi** | Matching Engine, FastAPI Service & Game Theory | [`docs/tasks/2026-11-12/TASK_PHI_AUCTION_ENGINE.md`](docs/tasks/2026-11-12/TASK_PHI_AUCTION_ENGINE.md) | **20/11/2026** |
+| **Ngô Văn Thắng** | Web3 Frontend DApp, Metadata Schema & UI/UX Figma | [`docs/tasks/2026-11-12/TASK_THANG_FRONTEND_WEB3.md`](docs/tasks/2026-11-12/TASK_THANG_FRONTEND_WEB3.md) | **20/11/2026** |
+| **Đặng Xuân Huy** | Lead Architect, Kiểm thử E2E, Slide & Báo cáo GVHD | [`docs/tasks/2026-11-12/TASK_HUY_LEAD_COORDINATION.md`](docs/tasks/2026-11-12/TASK_HUY_LEAD_COORDINATION.md) | **20/11/2026** |
 
 ### 🛠️ Quy trình 5 bước thực hiện task:
 1. **Mở file task cá nhân:** Đọc kỹ mô tả công việc, tiêu chí nghiệm thu và hạn chót.
@@ -90,7 +91,7 @@ Mỗi khi bắt đầu làm việc, thành viên bắt buộc thực hiện 3 b�
    git fetch origin
    git merge origin/main
    ```
-3. **Đối soát tài liệu đặc tả chuẩn:** Mọi cấu trúc struct, tham số hàm, logic khớp lệnh bắt buộc đối soát trực tiếp với [`docs/SRS_DOCUMENT.md`](docs/SRS_DOCUMENT.md) (IEEE 830) và [`docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md).
+3. **Đối soát tài liệu đặc tả chuẩn:** Mọi cấu trúc struct, tham số hàm, logic khớp lệnh bắt buộc đối soát trực tiếp với [`docs/specs/SRS_DOCUMENT.md`](docs/specs/SRS_DOCUMENT.md) (IEEE 830) và [`docs/architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md`](docs/architecture/ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md).
 
 ---
 
@@ -98,10 +99,10 @@ Mỗi khi bắt đầu làm việc, thành viên bắt buộc thực hiện 3 b�
 
 | Thành viên | Nhánh Git làm việc | Nhiệm vụ trọng tâm cần hoàn thành | Spec đối soát chính | Hạn chót (Deadline) |
 | :--- | :--- | :--- | :--- | :---: |
-| **Đặng Xuân Huy**<br/>*(Lead Architect)* | `main` | • Duy trì tài liệu kiến trúc, hồ sơ SRS IEEE 830.<br/>• Điều phối, giải quyết xung đột tích hợp 3 bên.<br/>• Tự động ghi nhật ký tiến độ hàng ngày lên `main`. | `docs/SRS_DOCUMENT.md`<br/>`docs/progress/` | **Liên tục hàng ngày** |
-| **Nguyễn Hoàng Đức**<br/>*(Smart Contract)* | `docs/smart-contract-spec` | • Viết code Solidity v2 cho `CarbonDoubleAuction.sol`.<br/>• Cài đặt đủ **7 chốt chặn bảo mật** và hàm `batchSettleTrades`.<br/>• Viết test Hardhat/Foundry đo gas thật ($< 100k$ gas/lệnh).<br/>• Deploy Polygon Amoy và xuất file ABI chuẩn cho Thắng. | **FR-11, FR-12**<br/>trong `SRS_DOCUMENT.md` | **20/11/2026** |
-| **Nguyễn Bảo Phi**<br/>*(Auction Algorithm)* | `auction-algorithm-engineer` | • Thay thế `auction_agent.py` bằng `session_engine.py`.<br/>• Cài đặt quy tắc giá $k$-DA uniform price và chia Hamilton.<br/>• Dựng Mock API FastAPI (`POST /orders`, `GET /orderbook`, `POST /sessions/run`).<br/>• Mô phỏng thực nghiệm đo Surplus Split & BNE Deadweight Loss. | **FR-06, FR-07, FR-08, FR-15**<br/>trong `SRS_DOCUMENT.md` | **25/11/2026** |
-| **Ngô Văn Thắng**<br/>*(Web3 Frontend)* | `feature/thang-web3-frontend-integration` | • Chuẩn hóa schema `docs/METADATA_SCHEMA.json`.<br/>• Hoàn thiện Wireframe Figma 4 phân hệ Web3 DApp.<br/>• Tích hợp luồng ký EIP-712 Gasless và gọi API FastAPI của Phi.<br/>• Bổ sung đồng hồ đếm ngược phiên (5p/15p) và order status. | **FR-04, FR-09**<br/>trong `SRS_DOCUMENT.md` | **30/11/2026** |
+| **Đặng Xuân Huy**<br/>*(Lead Architect)* | `main` | • Duy trì tài liệu kiến trúc, hồ sơ SRS IEEE 830.<br/>• Điều phối, giải quyết xung đột tích hợp 3 bên.<br/>• Tự động ghi nhật ký tiến độ hàng ngày lên `main`. | `docs/specs/SRS_DOCUMENT.md`<br/>`docs/progress/` | **Liên tục hàng ngày** |
+| **Nguyễn Hoàng Đức**<br/>*(Smart Contract)* | `docs/smart-contract-spec` | • Viết code Solidity v2 cho `CarbonDoubleAuction.sol`.<br/>• Cài đặt đủ **7 chốt chặn bảo mật** và hàm `batchSettleTrades`.<br/>• Viết test Hardhat/Foundry đo gas thật ($< 100k$ gas/lệnh).<br/>• Deploy Polygon Amoy và xuất file ABI chuẩn cho Thắng. | **FR-11, FR-12**<br/>trong `docs/specs/SRS_DOCUMENT.md` | **20/11/2026** |
+| **Nguyễn Bảo Phi**<br/>*(Auction Algorithm)* | `auction-algorithm-engineer` | • Thay thế `auction_agent.py` bằng `session_engine.py`.<br/>• Cài đặt quy tắc giá $k$-DA uniform price và chia Hamilton.<br/>• Dựng Mock API FastAPI (`POST /orders`, `GET /orderbook`, `POST /sessions/run`).<br/>• Mô phỏng thực nghiệm đo Surplus Split & BNE Deadweight Loss. | **FR-06, FR-07, FR-08, FR-15**<br/>trong `docs/specs/SRS_DOCUMENT.md` | **25/11/2026** |
+| **Ngô Văn Thắng**<br/>*(Web3 Frontend)* | `feature/thang-web3-frontend-integration` | • Chuẩn hóa schema `docs/METADATA_SCHEMA.json`.<br/>• Hoàn thiện Wireframe Figma 4 phân hệ Web3 DApp.<br/>• Tích hợp luồng ký EIP-712 Gasless và gọi API FastAPI của Phi.<br/>• Bổ sung đồng hồ đếm ngược phiên (5p/15p) và order status. | **FR-04, FR-09**<br/>trong `docs/specs/SRS_DOCUMENT.md` | **30/11/2026** |
 
 ---
 
@@ -161,15 +162,18 @@ Blockchain/
 │   ├── oracle_agent/           # Giám sát dải giá an toàn & chống thao túng
 │   └── retirement_agent/       # Tiêu hủy bù đắp & cấp chứng nhận ESG
 ├── docs/                       # Hồ sơ Thiết kế Kỹ thuật & Báo cáo NCKH
-│   ├── progress/               # Nhật ký tiến độ & quyết định kỹ thuật hàng ngày (SSOT trên main)
-│   │   ├── README.md           # Dashboard tổng thể & Template nhật ký
-│   │   └── 2026-11-10/         # Nhật ký chi tiết ngày 10/11/2026
-│   ├── SRS_DOCUMENT.md         # Đặc tả yêu cầu phần mềm IEEE 830-1998 & 4 biểu đồ UML Mermaid
-│   ├── ADR_001_AUCTION_ARCHITECTURE_DECISIONS.md # Quyết định kiến trúc khóa 4 thông số
-│   ├── SYSTEM_ARCHITECTURE.md  # Bản vẽ kiến trúc tổng thể v2.0
-│   ├── MATCHING_ENGINE_SPEC.md # Đặc tả kỹ thuật Matching Engine & API Service
-│   ├── METADATA_SCHEMA.json    # Lược đồ siêu dữ liệu IPFS cho lô tín chỉ
-│   └── HUONG_DAN_SU_DUNG_SUB_AGENTS.md # Cẩm nang vận hành 7 AI Sub-Agents
+│   ├── README.md               # Cẩm nang & Bản đồ Quản trị Tài liệu Dự án
+│   ├── architecture/           # Kiến trúc hệ thống, ADR-001, User Flows, Data Dictionary
+│   ├── specs/                  # Đặc tả SRS IEEE 830, Smart Contract, Matching Spec, Threat Modeling
+│   ├── integration/            # Tích hợp DApp, API Samples, Deployed Addresses, Bot Guide
+│   ├── planning/               # Kế hoạch Sprint, Roadmap, Kịch bản Demo nội bộ
+│   ├── reports/                # Báo cáo tổng quan giai đoạn, Slide thuyết trình
+│   ├── discussions/            # Ghi chép trao đổi kỹ thuật, lịch sử trạng thái
+│   ├── tasks/                  # Quản trị giao việc cá nhân (gói theo ngày YYYY-MM-DD)
+│   ├── progress/               # Nhật ký tiến độ hàng ngày (SSOT trên main)
+│   ├── wireframes/             # Thiết kế giao diện Figma (PNG & SVG)
+│   ├── examples/               # Dữ liệu mẫu JSON chuẩn quốc tế (Verra VCS, Gold Standard)
+│   └── METADATA_SCHEMA.json    # Lược đồ siêu dữ liệu IPFS cho lô tín chỉ
 ├── scripts/                    # Scripts tự động hóa (log_daily_progress.py, benchmark...)
 ├── tests/                      # Bộ kiểm thử hợp đồng và giải thuật toán
 └── README.md                   # Tài liệu hướng dẫn trung tâm của dự án

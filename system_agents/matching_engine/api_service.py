@@ -1,5 +1,5 @@
 """
-Mock API Service cho Matching Engine (SRS FR-15; docs/MATCHING_ENGINE_SPEC.md, mục 8).
+Mock API Service cho Matching Engine (SRS FR-15; docs/specs/MATCHING_ENGINE_SPEC.md, mục 8).
 
 Endpoint (tiền tố `/api/v1`):
 - POST   /orders                     đặt lệnh, kèm chữ ký EIP-712 `Order` của trader

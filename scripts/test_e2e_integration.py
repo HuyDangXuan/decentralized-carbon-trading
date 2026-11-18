@@ -27,7 +27,7 @@ Hỗ trợ 2 chế độ:
   1. Chế độ Hardhat cục bộ (--mode hardhat / --local): Tự động khởi chạy Hardhat node,
      triển khai bộ hợp đồng qua setup_hardhat_e2e.js, chạy uvicorn api_service.py và settlement.
   2. Chế độ Polygon Amoy Testnet (--mode amoy / --amoy): Kết nối RPC Amoy, sử dụng địa chỉ
-     hợp đồng chính thức theo docs/DEPLOYED_ADDRESSES.md, hỗ trợ --dry-run hoặc nộp thật.
+     hợp đồng chính thức theo docs/integration/DEPLOYED_ADDRESSES.md, hỗ trợ --dry-run hoặc nộp thật.
 ===============================================================================
 """
 
@@ -58,7 +58,7 @@ CONTRACTS_DIR = REPO_ROOT / "contracts"
 ABIS_DIR = CONTRACTS_DIR / "abis"
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
-# Thông số mặc định theo docs/DEPLOYED_ADDRESSES.md
+# Thông số mặc định theo docs/integration/DEPLOYED_ADDRESSES.md
 AMOY_CHAIN_ID = 80002
 AMOY_DEFAULT_RPC = "https://polygon-amoy-bor-rpc.publicnode.com"
 AMOY_FALLBACK_RPC = "https://poly-amoy-testnet.api.pocket.network"
@@ -305,7 +305,7 @@ class E2EIntegrationTester:
         self.operator_key = self.args.operator_key or os.environ.get("SETTLEMENT_OPERATOR_PRIVATE_KEY")
         self.deployer_key = self.args.deployer_key or os.environ.get("PRIVATE_KEY")
 
-        print("✅ Cấu hình hợp đồng chính thức Polygon Amoy Testnet (docs/DEPLOYED_ADDRESSES.md):")
+        print("✅ Cấu hình hợp đồng chính thức Polygon Amoy Testnet (docs/integration/DEPLOYED_ADDRESSES.md):")
         for k, v in self.contracts.items():
             print(f"   - {k.upper():<8}: {v}")
 

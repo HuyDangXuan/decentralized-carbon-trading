@@ -35,7 +35,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 TIE_BREAK = "age_prorata"  # Quyết định 2: age_prorata + Hamilton, phần dư bằng nhau thì FIFO
 # Quyết định 3: P* = floor((b_M + s_M) / 2). Công thức này trong session_engine là quy tắc
 # "marginal" (ADR gọi là "kda"); quy tắc "kda" của engine dùng thêm lệnh biên kế tiếp và khác
-# công thức ADR. Muốn đổi chỉ cần sửa hằng số này (xem docs/VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md).
+# công thức ADR. Muốn đổi chỉ cần sửa hằng số này (xem docs/discussions/VAN_DE_CAN_TRAO_DOI_MATCHING_ENGINE.md).
 PRICING_RULE = "marginal"
 ROUNDING = "floor"
 # Quyết định 4: rollover_count >= 3 thì EXPIRED, tức lệnh GTC sống tối đa 3 phiên.

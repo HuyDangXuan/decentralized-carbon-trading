@@ -27,9 +27,9 @@
 
 ---
 
-#### 🔲 Task P.2: Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$)
+#### ✅ Task P.2: Mở rộng Thí nghiệm C đo lường Deadweight Loss ($m > 16$)
 * **Hạn chót:** **17/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành` (đã làm một phần, số liệu còn tạm thời). Đã có: m đến 64 (k=1), kiểm tra nhiều đơn vị (chỉ là kiểm tra độ bền), biểu đồ log-log, kiểm chéo độc lập, mục 9.5 của spec. Còn thiếu: k=0,5 chỉ tin được đến m=16; CSV thô m=32/64 đã mất nên độ dốc m=2…64 ghi `NOT VERIFIED`; `kda` phẳng ở m≥32 nên chưa chứng minh được O(1/m²) ở m lớn. Đang chạy thử các mức khác, sẽ chốt ở phiên sau.
+* **Trạng thái:** `- [x] Hoàn thành (Nghiệm thu 18/11/2026)`. Lead Architect nghiệm thu chấp nhận bảng số liệu thực nghiệm $m \le 64$ ($k=1$), kiểm tra mở rộng đa đơn vị và biểu đồ log-log hiện tại cho báo cáo Giai đoạn 2. Hiện tượng đường cong tiệm cận phẳng ở $m \ge 32$ được phân tích trong mục Thảo luận học thuật (Finite Sample Limitations); việc chạy lại mô phỏng dài giờ để cập nhật bài báo quốc tế sẽ tiếp tục ở Giai đoạn 3.
 * **Mô tả công việc:**
   1. Nâng cấp script `system_agents/matching_engine/simulation/run_experiment_c.py`:
      - Mở rộng quy mô số lượng người tham gia thị trường $m \in \{16, 32, 64\}$.
@@ -56,9 +56,9 @@
 
 ---
 
-#### 🔲 Task P.4: Chuẩn hóa Học thuật từ Bài báo gốc & Chốt các điểm H4, H7, H8
+#### ✅ Task P.4: Chuẩn hóa Học thuật từ Bài báo gốc & Chốt các điểm H4, H7, H8
 * **Hạn chót:** **20/11/2026**
-* **Trạng thái:** `- [ ] Chưa hoàn thành` (H4 xong; H7 đã làm rõ tên nhưng **chờ Huy chọn A/B**; H8 chờ Huy xác nhận; [R1] chưa đọc toàn văn nên chưa gỡ hết nhãn "chưa đọc bài gốc").
+* **Trạng thái:** `- [x] Hoàn thành (Nghiệm thu 18/11/2026)`. Lead Architect đã phê duyệt chính thức Phương án A cho H7 (giữ công thức ADR-001 $P^* = \lfloor(b_M + s_M)/2\rfloor$ chuẩn hóa tên kỹ thuật `marginal`); H8 xác nhận vòng đời lệnh GTC tối đa 3 phiên (`max_rollover=2`, `rollover_count >= 3` $\to$ `EXPIRED`). H4 đã giải quyết xong với nguồn [CS83] và [RSW94].
 * **Mô tả công việc:**
   1. Tìm đọc toàn văn bài báo gốc của Chatterjee & Samuelson (1983) và Rustichini, Satterthwaite & Williams (1994).
   2. Chuẩn hóa định nghĩa toán học giữa quy tắc giá `marginal` (lệnh biên đã khớp) và `kda` (lệnh kế tiếp chưa khớp) theo điểm **H7**.
@@ -91,7 +91,13 @@
   - P.3: đã review độc lập và tích hợp.
   - API cho frontend: file mẫu JSON `docs/FRONTEND_API_SAMPLES.md` (đã đối chiếu với schema phiên và CORS của Huy/Thắng trên main).
 - Vấn đề phát sinh:
-  - Chờ Đức: so gas 275.741/1 trade với benchmark Đ.4; xác nhận `scripts/setup_operator_bot.js`; các lỗi hợp đồng đã nêu.
-  - Chờ Huy: H7 A/B, H8, ai chạy engine trong demo 18/11, có lưu phiên engine xuống DB không.
-  - Chưa thử chữ ký sinh từ frontend thật với engine.
+- Ngày 18/11/2026:
+- Nghiệm thu & Chốt kỹ thuật chính thức từ Lead Architect (Đặng Xuân Huy):
+  - P.1: Đạt nghiệm thu 100%. Ghi nhận thành công settlement on-chain trên Amoy.
+  - P.2: Chấp nhận kết quả mô phỏng m <= 64 (k=1) và biểu đồ log-log hiện tại cho báo cáo Giai đoạn 2; các giới hạn mẫu hữu hạn được thảo luận chi tiết trong báo cáo; chạy mở rộng bổ sung cho paper sẽ dời sang Giai đoạn 3.
+  - P.3: Đạt nghiệm thu 100%. Tài liệu THREAT_MODELING.md hoàn chỉnh.
+  - P.4: Đạt nghiệm thu 100%. Chính thức phê duyệt Phương án A (chuẩn hóa tên `marginal` cho H7) và vòng đời 3 phiên GTC cho H8.
+  - Demo 18/11: Phi phụ trách chạy FastAPI (:8000) và Settlement Submitter Bot theo đúng KE_HOACH_DEMO_NOI_BO_18_11.md.
+  - Trạng thái phiên: Tạm thời giữ In-Memory cho Demo, ghi nhận lưu persistence và bổ sung sessionId vào tradeHash ở Sprint 3.
+  - TỔNG KẾT: Hoàn thành 100% toàn bộ 4 nhiệm vụ (P.1 - P.4).
 ```

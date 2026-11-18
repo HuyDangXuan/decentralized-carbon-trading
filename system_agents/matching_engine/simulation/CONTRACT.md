@@ -1,7 +1,7 @@
 # CONTRACT — bộ mô phỏng thực nghiệm đấu giá kép (Giai đoạn 2, nhiệm vụ 3)
 
 Chủ sở hữu hợp đồng và `model.py`: Claude/Phi. Worker chỉ đọc hai file này.
-Kế hoạch thực nghiệm: [`docs/MATCHING_ENGINE_SPEC.md`](../../../docs/MATCHING_ENGINE_SPEC.md) §9.
+Kế hoạch thực nghiệm: [`docs/specs/MATCHING_ENGINE_SPEC.md`](../../../docs/specs/MATCHING_ENGINE_SPEC.md) §9.
 Chỉ dùng thư viện chuẩn, trừ `run_experiment.py` được dùng `matplotlib` (đã cài). Python 3.10+, PEP 8, đầu ra tiếng Việt in được trên Windows (`sys.stdout.reconfigure(encoding="utf-8")`).
 
 ## Quy ước chung

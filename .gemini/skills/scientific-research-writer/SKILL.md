@@ -8,7 +8,7 @@ description: Chuyên sâu về Viết báo cáo NCKH & Học thuật. Soạn th�
 Kỹ năng này trao quyền cho trợ lý AI Antigravity hỗ trợ bạn **Đặng Xuân Huy** (Chủ nhiệm đề tài) trong việc soạn thảo các báo cáo nghiên cứu khoa học, hồ sơ đặc tả phần mềm chuẩn quốc tế và chuẩn hóa tài liệu học thuật.
 
 ## Khi nào kích hoạt kỹ năng này?
-- Khi viết hoặc cập nhật tài liệu đặc tả yêu cầu phần mềm `docs/SRS_DOCUMENT.md` theo chuẩn IEEE 830-1998.
+- Khi viết hoặc cập nhật tài liệu đặc tả yêu cầu phần mềm `docs/specs/SRS_DOCUMENT.md` theo chuẩn IEEE 830-1998.
 - Khi vẽ và cập nhật các biểu đồ UML Mermaid (Use Case, Activity, Sequence, State Machine).
 - Khi soạn thảo báo cáo tổng quan và báo cáo kết quả NCKH theo chuẩn cấu trúc IMRaD.
 - Khi biên soạn công thức kinh tế lượng, lý thuyết trò chơi và chuẩn hóa danh mục tài liệu tham khảo BibTeX/LaTeX.
