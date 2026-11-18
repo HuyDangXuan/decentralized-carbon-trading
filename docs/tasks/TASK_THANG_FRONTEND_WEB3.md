@@ -79,9 +79,10 @@
 * **Tiêu chí nghiệm thu (Acceptance Criteria):**
   * Bộ bản vẽ Figma hoàn chỉnh 4 phân hệ được bàn giao cho Huy để đưa vào Slide và Hồ sơ Báo cáo tiến độ GĐ2 gửi GVHD.
 * **Kết quả nghiệm thu kỹ thuật (Acceptance Results):**
+  * **Link Figma Design công khai (Anyone with the link → Can view):** [CarbonChain DApp Mockups - T.4](https://www.figma.com/design/L85Og4PIRjZGjrdBQ6zhYb/CarbonChain-DApp-Mockups---T.4?node-id=0-1&p=f&t=6YjgjYTBTElvnSnX-0) — đã nhập đủ 4 frame `1440 × 1000 px` (`01-project-developer`, `02-verifier-vvb`, `03-trading-floor`, `04-esg-retirement`) và bật quyền xem công khai.
   * **4 tệp ảnh độ phân giải cao PNG 2880 × 2000 px:** Đã lưu trữ tại `docs/wireframes/` (`01-project-developer.png`, `02-verifier-vvb.png`, `03-trading-floor.png`, `04-esg-retirement.png`).
-  * **4 tệp vector nguồn SVG chuẩn Figma 1440 × 1000 px:** Sẵn sàng kéo thả nhập vào canvas Figma Design.
-  * **Tài liệu hướng dẫn đối soát UI/UX:** `docs/wireframes/README.md` đối soát từng luồng theo chuẩn SRS IEEE 830 §3.1.
+  * **4 tệp vector nguồn SVG chuẩn Figma 1440 × 1000 px:** Đã lưu trữ tại `docs/wireframes/` và nhập hoàn chỉnh vào file Figma Design ở trên.
+  * **Tài liệu hướng dẫn đối soát UI/UX:** `docs/wireframes/README.md` đã điền link Figma công khai và đối soát từng luồng theo chuẩn SRS IEEE 830 §3.1.
 
 ---
 
@@ -106,3 +107,4 @@
 - **Điều kiện nghiệm thu T.3** Cần xác nhận ký bằng MetaMask thật và ghi bằng chứng trên web. Khớp phiên trong FastAPI hiện chạy thủ công. GTC/IOC do Matching Engine xử lý, còn mẫu chữ ký trên Amoy hiện tại chỉ ràng buộc hạn lệnh theo `deadline` và chưa ký `timeInForce` như SRS.
 - **17/11/2026 · T.4** Đã dựng bốn mockup theo SRS và xuất ảnh PNG 2880 × 2000 px cùng nguồn SVG tại [thư mục wireframes](../wireframes/README.md). Còn chờ nhập vào Figma Design và xác minh Huy mở được link xem trước khi tích hoàn thành.
 - **17/11/2026 · Nghiệm thu Task T.3 & T.4:** Đã hoàn tất 100% kiểm thử kỹ thuật frontend, 20/20 test cases pass, build production sạch (`0 errors`); hoàn thành bàn giao trọn bộ 4 mockup PNG/SVG tại `docs/wireframes/` sẵn sàng cho phiên Demo 18/11 và slide báo cáo Giai đoạn 2. Chính thức hoàn thành 4/4 tasks (T.1, T.2, T.3, T.4).
+- **18/11/2026 · Bàn giao Figma T.4:** Đã nhập hoàn chỉnh bốn frame SVG (`1440 × 1000 px`) vào file **Figma Design** `CarbonChain DApp Mockups - T.4`, sắp xếp ngang `01 → 04` không chồng lấn, bật quyền chia sẻ công khai (**Anyone with the link → Can view**) và cập nhật đường dẫn xem trực tiếp vào [`docs/wireframes/README.md`](../wireframes/README.md) để Huy kiểm tra mở xem. [Mở file Figma T.4](https://www.figma.com/design/L85Og4PIRjZGjrdBQ6zhYb/CarbonChain-DApp-Mockups---T.4?node-id=0-1&p=f&t=6YjgjYTBTElvnSnX-0)

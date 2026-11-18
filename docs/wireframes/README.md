@@ -18,8 +18,8 @@ Bộ thiết kế desktop cho bốn phân hệ CarbonChain, theo [SRS §3.1](../
 
 ## Bàn giao Figma
 
-**Link Figma có quyền xem cho Huy:** chờ nhập bộ thiết kế vào workspace của nhóm.
+**Link Figma có quyền xem cho Huy (Anyone with the link → Can view):** [CarbonChain DApp Mockups - T.4 (Figma Design)](https://www.figma.com/design/L85Og4PIRjZGjrdBQ6zhYb/CarbonChain-DApp-Mockups---T.4?node-id=0-1&p=f&t=6YjgjYTBTElvnSnX-0)
 
-1. Mở một file **Figma Design** có quyền chỉnh sửa và nhập bốn tệp SVG vào canvas. Tạo bốn frame 1440 × 1000 px, mỗi frame chứa một mockup theo thứ tự của bảng trên. [Hướng dẫn nhập vector trong Figma](https://help.figma.com/hc/en-us/articles/360040027794-Guide-to-imports-in-Figma-Design)
-2. Kiểm tra chữ tiếng Việt, biểu đồ và QR sau khi nhập. Dùng các ảnh PNG trong bảng để đối chiếu bố cục và chèn vào báo cáo.
-3. Ghi link của file vào mục trên, xác minh Huy có thể xem và cập nhật checklist T.4 sau khi bàn giao.
+1. ✅ Đã tạo file **Figma Design** (`CarbonChain DApp Mockups - T.4`) và nhập đủ bốn tệp SVG vào canvas thành bốn frame `1440 × 1000 px` (`01-project-developer`, `02-verifier-vvb`, `03-trading-floor`, `04-esg-retirement`), sắp xếp ngang không chồng lấn theo đúng thứ tự bảng trên.
+2. ✅ Đã đối chiếu hiển thị chữ tiếng Việt, biểu đồ và mã QR trên canvas Figma khớp với bốn ảnh PNG 2880 × 2000 px.
+3. ✅ Đã bật quyền chia sẻ công khai **Anyone with the link → Can view** và đính kèm link vào tài liệu này để Huy kiểm tra mở xem trực tiếp.
